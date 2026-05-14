@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-const STORAGE_KEY = "daterank_chicago_dates_v1";
+const STORAGE_KEY = "daterank_my_dates_v2";
 
-
-const starterDates = [
+const exploreDates = [
   {
-    id: "aba-lazybird",
+    id: "explore-aba-lazybird",
+    user: "Maya",
+    avatar: "M",
     title: "West Loop Dinner + Drinks",
     neighborhood: "West Loop",
     price: "$$$",
@@ -19,7 +20,9 @@ const starterDates = [
     notes: "Perfect second date energy. Feels impressive but not too serious.",
   },
   {
-    id: "quartino-violet",
+    id: "explore-quartino-violet",
+    user: "Sofia",
+    avatar: "S",
     title: "River North Cozy Night",
     neighborhood: "River North",
     price: "$$",
@@ -33,7 +36,9 @@ const starterDates = [
     notes: "Great for winter dates and long conversations.",
   },
   {
-    id: "museum-date",
+    id: "explore-museum-date",
+    user: "Arjun",
+    avatar: "A",
     title: "Cute Day Date",
     neighborhood: "Loop",
     price: "$$",
@@ -47,7 +52,9 @@ const starterDates = [
     notes: "Ideal first date because there’s always something to talk about.",
   },
   {
-    id: "monteverde-rm",
+    id: "explore-monteverde-rm",
+    user: "Lena",
+    avatar: "L",
     title: "West Loop Pasta Night",
     neighborhood: "West Loop",
     price: "$$$$",
@@ -61,7 +68,9 @@ const starterDates = [
     notes: "Very strong special occasion energy. Expensive, but feels worth it.",
   },
   {
-    id: "dorians-milkbar",
+    id: "explore-dorians-milkbar",
+    user: "Priya",
+    avatar: "P",
     title: "Wicker Park Late Night",
     neighborhood: "Wicker Park",
     price: "$$$",
@@ -75,7 +84,9 @@ const starterDates = [
     notes: "Fun, younger, late-night energy. Better once you already know each other.",
   },
   {
-    id: "galit-kingston",
+    id: "explore-galit-kingston",
+    user: "Noah",
+    avatar: "N",
     title: "Lincoln Park Foodie Date",
     neighborhood: "Lincoln Park",
     price: "$$$",
@@ -89,7 +100,9 @@ const starterDates = [
     notes: "Dinner into blues club is elite. Great if you want the night to feel planned.",
   },
   {
-    id: "avec-aviary",
+    id: "explore-avec-aviary",
+    user: "Emma",
+    avatar: "E",
     title: "Impress Them Date",
     neighborhood: "West Loop",
     price: "$$$$",
@@ -103,7 +116,9 @@ const starterDates = [
     notes: "Very expensive but unforgettable. Best for birthdays, anniversaries, or going all out.",
   },
   {
-    id: "northpond-lakefront",
+    id: "explore-northpond-lakefront",
+    user: "Jordan",
+    avatar: "J",
     title: "Classic Chicago Romance",
     neighborhood: "Lincoln Park",
     price: "$$$$",
@@ -117,7 +132,9 @@ const starterDates = [
     notes: "Feels like a movie. Best when the weather is nice enough for a walk after.",
   },
   {
-    id: "lula-revolution",
+    id: "explore-lula-revolution",
+    user: "Maya",
+    avatar: "M",
     title: "Logan Square Cozy Date",
     neighborhood: "Logan Square",
     price: "$$",
@@ -131,7 +148,9 @@ const starterDates = [
     notes: "Very neighborhood-core. Good when you want something warm and easy.",
   },
   {
-    id: "cindys-riverwalk",
+    id: "explore-cindys-riverwalk",
+    user: "Sofia",
+    avatar: "S",
     title: "Summer Chicago Date",
     neighborhood: "Loop",
     price: "$$$",
@@ -145,7 +164,9 @@ const starterDates = [
     notes: "Amazing sunset views. Slightly touristy, but in a good way.",
   },
   {
-    id: "spacca-ravenswood",
+    id: "explore-spacca-ravenswood",
+    user: "Ben",
+    avatar: "B",
     title: "Neighborhood Pizza Night",
     neighborhood: "Ravenswood",
     price: "$$",
@@ -158,7 +179,9 @@ const starterDates = [
     notes: "Easy low-stress dinner date. Great if you want quality food without making it too formal.",
   },
   {
-    id: "gilt-violet",
+    id: "explore-gilt-violet",
+    user: "Avery",
+    avatar: "A",
     title: "Dark River North Date",
     neighborhood: "River North",
     price: "$$$",
@@ -172,7 +195,9 @@ const starterDates = [
     notes: "Excellent winter energy. Dark, moody, and easy to keep the conversation going.",
   },
   {
-    id: "mca-sparrow",
+    id: "explore-mca-sparrow",
+    user: "Riley",
+    avatar: "R",
     title: "Gold Coast Artsy Night",
     neighborhood: "Gold Coast",
     price: "$$$",
@@ -186,7 +211,9 @@ const starterDates = [
     notes: "Very aesthetic date night. Good for someone who likes design, art, and moody cocktails.",
   },
   {
-    id: "bavettes-3dots",
+    id: "explore-bavettes-3dots",
+    user: "Chris",
+    avatar: "C",
     title: "River North Fancy Dinner + Tiki",
     neighborhood: "River North",
     price: "$$$$",
@@ -200,21 +227,9 @@ const starterDates = [
     notes: "Starts classic and sexy, ends more playful. Great if you want the night to have range.",
   },
   {
-    id: "arlo-drawing-room",
-    title: "Gold Coast Hotel Bar Date",
-    neighborhood: "Gold Coast",
-    price: "$$$",
-    dateTypes: ["Dinner", "Cocktails"],
-    vibes: ["Fancy", "Intimate", "Pretty"],
-    rating: 8.9,
-    places: [
-      { name: "Adalina", type: "Dinner", ordered: ["Pasta", "Burrata"] },
-      { name: "The Drawing Room", type: "Cocktails", ordered: ["Martini"] },
-    ],
-    notes: "Polished and grown-up. Good for a dressier night without going full special occasion.",
-  },
-  {
-    id: "andros-scofflaw",
+    id: "explore-andros-scofflaw",
+    user: "Nina",
+    avatar: "N",
     title: "Logan Square Dinner + Gin",
     neighborhood: "Logan Square",
     price: "$$$",
@@ -228,7 +243,9 @@ const starterDates = [
     notes: "Great food and not too stiff. Works well for a second or third date.",
   },
   {
-    id: "lost-larson-walk",
+    id: "explore-lost-larson-walk",
+    user: "Theo",
+    avatar: "T",
     title: "Andersonville Coffee Walk",
     neighborhood: "Andersonville",
     price: "$",
@@ -242,7 +259,9 @@ const starterDates = [
     notes: "Very easy first date. Low pressure, cute, and flexible if the conversation is good.",
   },
   {
-    id: "beatnik-sportsmans",
+    id: "explore-beatnik-sportsmans",
+    user: "Mia",
+    avatar: "M",
     title: "West Town Pretty Drinks Night",
     neighborhood: "West Town",
     price: "$$$",
@@ -256,7 +275,9 @@ const starterDates = [
     notes: "Very good if you want atmosphere and a slightly cooler neighborhood feel.",
   },
   {
-    id: "zanies-oldtown",
+    id: "explore-zanies-oldtown",
+    user: "Sam",
+    avatar: "S",
     title: "Old Town Comedy Date",
     neighborhood: "Old Town",
     price: "$$",
@@ -270,7 +291,9 @@ const starterDates = [
     notes: "Good if you want built-in entertainment and don’t want to carry the whole conversation.",
   },
   {
-    id: "ninebar-chinatown",
+    id: "explore-ninebar-chinatown",
+    user: "Iris",
+    avatar: "I",
     title: "Chinatown Drinks + Bites",
     neighborhood: "Chinatown",
     price: "$$",
@@ -284,7 +307,9 @@ const starterDates = [
     notes: "Feels less obvious than the usual date-night neighborhoods. Fun and memorable.",
   },
   {
-    id: "promontory-point",
+    id: "explore-promontory-point",
+    user: "Leo",
+    avatar: "L",
     title: "Hyde Park Lake Date",
     neighborhood: "Hyde Park",
     price: "$",
@@ -298,7 +323,9 @@ const starterDates = [
     notes: "Beautiful lake views. Best for daytime, especially when the weather is good.",
   },
   {
-    id: "middlebrow-bestintentions",
+    id: "explore-middlebrow-bestintentions",
+    user: "Grace",
+    avatar: "G",
     title: "Logan Square Pizza + Dive Bar",
     neighborhood: "Logan Square",
     price: "$$",
@@ -312,7 +339,9 @@ const starterDates = [
     notes: "Very easygoing. Good if you want something cool but not too polished.",
   },
   {
-    id: "gibsons-sparrow",
+    id: "explore-gibsons-sparrow",
+    user: "Max",
+    avatar: "M",
     title: "Classic Gold Coast Night",
     neighborhood: "Gold Coast",
     price: "$$$$",
@@ -326,7 +355,9 @@ const starterDates = [
     notes: "Old-school Chicago energy. Good for someone who likes classic, not trendy.",
   },
   {
-    id: "parsons-estereo",
+    id: "explore-parsons-estereo",
+    user: "Kat",
+    avatar: "K",
     title: "Patio Drinks Date",
     neighborhood: "Logan Square",
     price: "$$",
@@ -340,7 +371,9 @@ const starterDates = [
     notes: "Best for warm weather. Casual, social, and good if you want playful energy.",
   },
   {
-    id: "boka-kingston",
+    id: "explore-boka-kingston",
+    user: "Dylan",
+    avatar: "D",
     title: "Lincoln Park Fancy + Blues",
     neighborhood: "Lincoln Park",
     price: "$$$$",
@@ -353,73 +386,11 @@ const starterDates = [
     ],
     notes: "Fancy dinner then music makes it feel like a real planned evening.",
   },
-  {
-    id: "jibaritos-humboldt",
-    title: "Casual Humboldt Park Date",
-    neighborhood: "Humboldt Park",
-    price: "$",
-    dateTypes: ["Dinner", "Walk"],
-    vibes: ["Casual", "Fun", "Low Pressure"],
-    rating: 8.2,
-    places: [
-      { name: "Jibaritos y Mas", type: "Dinner", ordered: ["Jibarito", "Tostones"] },
-      { name: "Humboldt Park", type: "Walk", ordered: [] },
-    ],
-    notes: "Affordable, casual, and different from a generic dinner date.",
-  },
 ];
 
-const allVibes = [
-  "Romantic",
-  "Pretty",
-  "Lively",
-  "Cozy",
-  "Dark",
-  "Fun",
-  "Cute",
-  "Daytime",
-  "Artsy",
-  "Fancy",
-  "Casual",
-  "Intimate",
-  "Impressive",
-  "Low Pressure",
-  "Adventurous",
-];
-
-const allTypes = [
-  "Dinner",
-  "Drinks",
-  "Cocktails",
-  "Coffee",
-  "Dessert",
-  "Activity",
-  "Walk",
-  "Brunch",
-  "Museum",
-  "Show",
-  "Rooftop",
-];
-
-const allNeighborhoods = [
-  "West Loop",
-  "River North",
-  "Loop",
-  "Logan Square",
-  "Wicker Park",
-  "Lincoln Park",
-  "Lakeview",
-  "Gold Coast",
-  "Hyde Park",
-  "Andersonville",
-  "Chinatown",
-  "Ravenswood",
-  "West Town",
-  "Old Town",
-  "Humboldt Park",
-  "Other",
-];
-
+const allVibes = ["Romantic", "Pretty", "Lively", "Cozy", "Dark", "Fun", "Cute", "Daytime", "Artsy", "Fancy", "Casual", "Intimate", "Impressive", "Low Pressure", "Adventurous"];
+const allTypes = ["Dinner", "Drinks", "Cocktails", "Coffee", "Dessert", "Activity", "Walk", "Brunch", "Museum", "Show", "Rooftop"];
+const allNeighborhoods = ["West Loop", "River North", "Loop", "Logan Square", "Wicker Park", "Lincoln Park", "Lakeview", "Gold Coast", "Hyde Park", "Andersonville", "Chinatown", "Ravenswood", "West Town", "Old Town", "Humboldt Park", "Other"];
 const allPrices = ["$", "$$", "$$$", "$$$$"];
 
 const vibeColors = {
@@ -456,16 +427,18 @@ function emptyForm() {
   };
 }
 
-export default function App() {
-  const [dates, setDates] = useState(() => {
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : starterDates;
-    } catch {
-      return starterDates;
-    }
-  });
+function getInitialMyDates() {
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
 
+export default function App() {
+  const [activePage, setActivePage] = useState("myDates");
+  const [myDates, setMyDates] = useState(getInitialMyDates);
   const [selectedVibe, setSelectedVibe] = useState("All");
   const [selectedType, setSelectedType] = useState("All");
   const [selectedNeighborhood, setSelectedNeighborhood] = useState("All");
@@ -474,15 +447,28 @@ export default function App() {
   const [form, setForm] = useState(emptyForm());
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(dates));
-  }, [dates]);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(myDates));
+  }, [myDates]);
 
-  const vibes = useMemo(() => ["All", ...new Set(dates.flatMap((p) => p.vibes))], [dates]);
-  const types = useMemo(() => ["All", ...new Set(dates.flatMap((p) => p.dateTypes))], [dates]);
-  const neighborhoods = useMemo(() => ["All", ...new Set(dates.map((p) => p.neighborhood))], [dates]);
-  const prices = useMemo(() => ["All", ...new Set(dates.map((p) => p.price))], [dates]);
+  const currentDates = activePage === "myDates" ? myDates : exploreDates;
+  const pageTitle = activePage === "myDates" ? "Your Dates" : "Explore";
+  const pageSubtitle = activePage === "myDates" ? "Your personal date-night ranking dashboard." : "Get inspiration from other people’s date-night posts.";
 
-  const filtered = dates.filter((date) => {
+  const sortedDates = useMemo(() => {
+    return [...currentDates].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+  }, [currentDates]);
+
+  const filterOptions = useMemo(() => {
+    const source = currentDates.length ? currentDates : exploreDates;
+    return {
+      vibes: ["All", ...new Set(source.flatMap((p) => p.vibes))],
+      types: ["All", ...new Set(source.flatMap((p) => p.dateTypes))],
+      neighborhoods: ["All", ...new Set(source.map((p) => p.neighborhood))],
+      prices: ["All", ...new Set(source.map((p) => p.price))],
+    };
+  }, [currentDates]);
+
+  const filtered = sortedDates.filter((date) => {
     return (
       (selectedVibe === "All" || date.vibes.includes(selectedVibe)) &&
       (selectedType === "All" || date.dateTypes.includes(selectedType)) &&
@@ -490,6 +476,15 @@ export default function App() {
       (selectedPrice === "All" || date.price === selectedPrice)
     );
   });
+
+  const kpis = useMemo(() => buildKpis(currentDates), [currentDates]);
+
+  function resetFilters() {
+    setSelectedVibe("All");
+    setSelectedType("All");
+    setSelectedNeighborhood("All");
+    setSelectedPrice("All");
+  }
 
   function toggleArrayValue(field, value) {
     setForm((prev) => {
@@ -528,14 +523,13 @@ export default function App() {
       .map((place) => ({
         name: place.name.trim(),
         type: place.type,
-        ordered: place.orderedText
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        ordered: place.orderedText.split(",").map((item) => item.trim()).filter(Boolean),
       }));
 
     const newDate = {
-      id: `${Date.now()}`,
+      id: `my-${Date.now()}`,
+      user: "You",
+      avatar: "Y",
       title: form.title.trim() || "Untitled Date Night",
       neighborhood: form.neighborhood,
       price: form.price,
@@ -546,40 +540,45 @@ export default function App() {
       notes: form.notes.trim() || "No notes yet.",
     };
 
-    setDates((prev) => [newDate, ...prev]);
+    setMyDates((prev) => [newDate, ...prev]);
     setForm(emptyForm());
     setIsModalOpen(false);
+    setActivePage("myDates");
+    resetFilters();
   }
 
   function deleteDate(id) {
-    setDates((prev) => prev.filter((date) => date.id !== id));
+    setMyDates((prev) => prev.filter((date) => date.id !== id));
   }
 
-  function resetDemoData() {
-    setDates(starterDates);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(starterDates));
+  function clearMyDates() {
+    setMyDates([]);
+    window.localStorage.removeItem(STORAGE_KEY);
   }
 
   return (
     <div className="min-h-screen bg-[#f7f2e9] text-[#172033]">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-[#10182A] px-6 py-5 text-white shadow-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 text-xl font-black">
-              D
-            </div>
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 text-xl font-black">D</div>
             <div>
               <h1 className="text-2xl font-black tracking-tight">DateRank Chicago</h1>
               <p className="text-sm text-slate-400">Rank full date nights, not just places.</p>
             </div>
           </div>
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg hover:bg-orange-600"
-          >
-            + Add Date
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => { setActivePage("myDates"); resetFilters(); }} className={`rounded-2xl px-5 py-3 text-sm font-black ${activePage === "myDates" ? "bg-white text-[#10182A]" : "bg-white/10 text-white hover:bg-white/20"}`}>
+              Your Dates
+            </button>
+            <button onClick={() => { setActivePage("explore"); resetFilters(); }} className={`rounded-2xl px-5 py-3 text-sm font-black ${activePage === "explore" ? "bg-white text-[#10182A]" : "bg-white/10 text-white hover:bg-white/20"}`}>
+              Explore
+            </button>
+            <button onClick={() => setIsModalOpen(true)} className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg hover:bg-orange-600">
+              + Add Date
+            </button>
+          </div>
         </div>
       </header>
 
@@ -587,44 +586,43 @@ export default function App() {
         <section className="mb-6 rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">
-                Plan a date
-              </p>
-              <h2 className="mt-2 text-3xl font-black">
-                Find a date night that matches the vibe
-              </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Filter saved date nights by activity, neighborhood, price, and vibe.
-              </p>
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">{pageTitle}</p>
+              <h2 className="mt-2 text-3xl font-black">{activePage === "myDates" ? "Your ranked date nights" : "Discover date-night ideas"}</h2>
+              <p className="mt-2 text-sm text-slate-500">{pageSubtitle}</p>
             </div>
-
-            <button
-              onClick={resetDemoData}
-              className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-600 hover:bg-slate-200"
-            >
-              Reset demo data
-            </button>
+            {activePage === "myDates" && myDates.length > 0 && (
+              <button onClick={clearMyDates} className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-600 hover:bg-slate-200">
+                Clear your dates
+              </button>
+            )}
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-4">
-            <Select label="Date type" value={selectedType} onChange={setSelectedType} options={types} />
-            <Select label="Neighborhood" value={selectedNeighborhood} onChange={setSelectedNeighborhood} options={neighborhoods} />
-            <Select label="Price" value={selectedPrice} onChange={setSelectedPrice} options={prices} />
-            <Select label="Vibe" value={selectedVibe} onChange={setSelectedVibe} options={vibes} />
+            <Select label="Date type" value={selectedType} onChange={setSelectedType} options={filterOptions.types} />
+            <Select label="Neighborhood" value={selectedNeighborhood} onChange={setSelectedNeighborhood} options={filterOptions.neighborhoods} />
+            <Select label="Price" value={selectedPrice} onChange={setSelectedPrice} options={filterOptions.prices} />
+            <Select label="Vibe" value={selectedVibe} onChange={setSelectedVibe} options={filterOptions.vibes} />
           </div>
         </section>
 
-        {filtered.length === 0 ? (
+        <section className="mb-6 grid gap-4 md:grid-cols-4">
+          <KpiCard label={activePage === "myDates" ? "Dates logged" : "Explore posts"} value={kpis.count} helper={activePage === "myDates" ? "Your saved date nights" : "Public inspo posts"} />
+          <KpiCard label="Neighborhoods" value={kpis.neighborhoods} helper="Unique areas represented" />
+          <KpiCard label="Average rating" value={kpis.averageRating} helper="Across visible source" />
+          <KpiCard label="Top vibe" value={kpis.topVibe} helper="Most common tag" />
+        </section>
+
+        {activePage === "myDates" && myDates.length === 0 ? (
+          <EmptyMyDates onAdd={() => setIsModalOpen(true)} onExplore={() => setActivePage("explore")} />
+        ) : filtered.length === 0 ? (
           <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
             <h3 className="text-2xl font-black">No matching dates yet</h3>
-            <p className="mt-2 text-slate-500">
-              Try different filters or add a new date with those attributes.
-            </p>
+            <p className="mt-2 text-slate-500">Try different filters or add a date with those attributes.</p>
           </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
-            {filtered.map((date) => (
-              <DateCard key={date.id} date={date} onDelete={deleteDate} />
+            {filtered.map((date, index) => (
+              <DateCard key={date.id} date={date} rank={index + 1} mode={activePage} onDelete={deleteDate} />
             ))}
           </div>
         )}
@@ -635,112 +633,40 @@ export default function App() {
           <form onSubmit={submitDate} className="mx-auto my-8 max-w-4xl rounded-[2rem] bg-white p-6 shadow-2xl">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">
-                  Add a date
-                </p>
-                <h2 className="mt-2 text-3xl font-black">Log a full date night</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  This saves locally in this browser for now. Supabase can sync it across devices later.
-                </p>
+                <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">Add a date</p>
+                <h2 className="mt-2 text-3xl font-black">Log one of your date nights</h2>
+                <p className="mt-1 text-sm text-slate-500">This saves locally in your browser for now. Supabase can sync it across devices later.</p>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-xl font-black hover:bg-slate-200"
-              >
-                ×
-              </button>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-xl font-black hover:bg-slate-200">×</button>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <Field
-                label="Date title"
-                value={form.title}
-                onChange={(value) => setForm({ ...form, title: value })}
-                placeholder="West Loop dinner + drinks"
-              />
-              <Field
-                label="Rating"
-                value={form.rating}
-                onChange={(value) => setForm({ ...form, rating: value })}
-                placeholder="9.2"
-              />
-              <Select
-                label="Neighborhood"
-                value={form.neighborhood}
-                onChange={(value) => setForm({ ...form, neighborhood: value })}
-                options={allNeighborhoods}
-              />
-              <Select
-                label="Price"
-                value={form.price}
-                onChange={(value) => setForm({ ...form, price: value })}
-                options={allPrices}
-              />
+              <Field label="Date title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} placeholder="West Loop dinner + drinks" />
+              <Field label="Rating" value={form.rating} onChange={(value) => setForm({ ...form, rating: value })} placeholder="9.2" />
+              <Select label="Neighborhood" value={form.neighborhood} onChange={(value) => setForm({ ...form, neighborhood: value })} options={allNeighborhoods} />
+              <Select label="Price" value={form.price} onChange={(value) => setForm({ ...form, price: value })} options={allPrices} />
             </div>
 
-            <ChipSection
-              title="What did the date include?"
-              options={allTypes}
-              selected={form.dateTypes}
-              onToggle={(value) => toggleArrayValue("dateTypes", value)}
-            />
-
-            <ChipSection
-              title="What was the vibe?"
-              options={allVibes}
-              selected={form.vibes}
-              onToggle={(value) => toggleArrayValue("vibes", value)}
-            />
+            <ChipSection title="What did the date include?" options={allTypes} selected={form.dateTypes} onToggle={(value) => toggleArrayValue("dateTypes", value)} />
+            <ChipSection title="What was the vibe?" options={allVibes} selected={form.vibes} onToggle={(value) => toggleArrayValue("vibes", value)} />
 
             <div className="mt-6 rounded-[2rem] bg-slate-50 p-4 ring-1 ring-slate-200">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-lg font-black">Stops / places</h3>
-                <button
-                  type="button"
-                  onClick={addStop}
-                  className="rounded-2xl bg-[#172033] px-4 py-2 text-sm font-black text-white"
-                >
-                  + Add stop
-                </button>
+                <button type="button" onClick={addStop} className="rounded-2xl bg-[#172033] px-4 py-2 text-sm font-black text-white">+ Add stop</button>
               </div>
-
               <div className="space-y-4">
                 {form.places.map((place, index) => (
                   <div key={index} className="rounded-3xl bg-white p-4 ring-1 ring-slate-200">
                     <div className="mb-3 flex items-center justify-between">
                       <span className="font-black text-orange-500">Stop {index + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeStop(index)}
-                        className="text-sm font-bold text-slate-400 hover:text-red-500"
-                      >
-                        Remove
-                      </button>
+                      <button type="button" onClick={() => removeStop(index)} className="text-sm font-bold text-slate-400 hover:text-red-500">Remove</button>
                     </div>
-
                     <div className="grid gap-3 md:grid-cols-[1fr_160px]">
-                      <Field
-                        label="Place name"
-                        value={place.name}
-                        onChange={(value) => updatePlace(index, "name", value)}
-                        placeholder="Aba"
-                      />
-                      <Select
-                        label="Type"
-                        value={place.type}
-                        onChange={(value) => updatePlace(index, "type", value)}
-                        options={allTypes}
-                      />
+                      <Field label="Place name" value={place.name} onChange={(value) => updatePlace(index, "name", value)} placeholder="Aba" />
+                      <Select label="Type" value={place.type} onChange={(value) => updatePlace(index, "type", value)} options={allTypes} />
                     </div>
-
-                    <Field
-                      label="What did you order / do?"
-                      value={place.orderedText}
-                      onChange={(value) => updatePlace(index, "orderedText", value)}
-                      placeholder="Whipped feta, espresso martini, walk by the river"
-                    />
+                    <Field label="What did you order / do?" value={place.orderedText} onChange={(value) => updatePlace(index, "orderedText", value)} placeholder="Whipped feta, espresso martini, walk by the river" />
                   </div>
                 ))}
               </div>
@@ -748,28 +674,12 @@ export default function App() {
 
             <label className="mt-5 block">
               <span className="mb-2 block text-sm font-black text-slate-700">Notes</span>
-              <textarea
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder="What made this date good? Who is it best for? Any watch-outs?"
-                className="min-h-28 w-full rounded-2xl bg-slate-50 px-4 py-3 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400"
-              />
+              <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="What made this date good? Who is it best for? Any watch-outs?" className="min-h-28 w-full rounded-2xl bg-slate-50 px-4 py-3 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400" />
             </label>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-2xl bg-slate-100 px-6 py-3 font-black text-slate-600 hover:bg-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="rounded-2xl bg-orange-500 px-6 py-3 font-black text-white shadow-lg shadow-orange-200 hover:bg-orange-600"
-              >
-                Add date to list
-              </button>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-2xl bg-slate-100 px-6 py-3 font-black text-slate-600 hover:bg-slate-200">Cancel</button>
+              <button type="submit" className="rounded-2xl bg-orange-500 px-6 py-3 font-black text-white shadow-lg shadow-orange-200 hover:bg-orange-600">Add to Your Dates</button>
             </div>
           </form>
         </div>
@@ -778,18 +688,45 @@ export default function App() {
   );
 }
 
+function buildKpis(dates) {
+  if (!dates.length) return { count: 0, neighborhoods: 0, averageRating: "—", topVibe: "—" };
+  const neighborhoods = new Set(dates.map((date) => date.neighborhood)).size;
+  const average = dates.reduce((sum, date) => sum + Number(date.rating || 0), 0) / dates.length;
+  const vibeCounts = dates.flatMap((date) => date.vibes).reduce((acc, vibe) => ({ ...acc, [vibe]: (acc[vibe] || 0) + 1 }), {});
+  const topVibe = Object.entries(vibeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+  return { count: dates.length, neighborhoods, averageRating: average.toFixed(1), topVibe };
+}
+
+function KpiCard({ label, value, helper }) {
+  return (
+    <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <div className="mt-3 text-3xl font-black text-[#172033]">{value}</div>
+      <p className="mt-1 text-sm font-semibold text-slate-500">{helper}</p>
+    </div>
+  );
+}
+
+function EmptyMyDates({ onAdd, onExplore }) {
+  return (
+    <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-orange-100 text-3xl">💘</div>
+      <h3 className="mt-5 text-3xl font-black">No dates logged yet</h3>
+      <p className="mx-auto mt-2 max-w-xl text-slate-500">Your personal dashboard starts empty. Add your own date nights here, then use Explore for inspiration from other people.</p>
+      <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+        <button onClick={onAdd} className="rounded-2xl bg-orange-500 px-6 py-3 font-black text-white shadow-lg shadow-orange-200 hover:bg-orange-600">+ Add your first date</button>
+        <button onClick={onExplore} className="rounded-2xl bg-slate-100 px-6 py-3 font-black text-slate-600 hover:bg-slate-200">Browse Explore</button>
+      </div>
+    </div>
+  );
+}
+
 function Select({ label, value, onChange, options }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-black text-slate-700">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-2xl bg-slate-50 px-4 py-4 font-bold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400"
-      >
-        {options.map((option) => (
-          <option key={option}>{option}</option>
-        ))}
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-2xl bg-slate-50 px-4 py-4 font-bold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400">
+        {options.map((option) => <option key={option}>{option}</option>)}
       </select>
     </label>
   );
@@ -799,12 +736,7 @@ function Field({ label, value, onChange, placeholder }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-black text-slate-700">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400"
-      />
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400" />
     </label>
   );
 }
@@ -817,14 +749,7 @@ function ChipSection({ title, options, selected, onToggle }) {
         {options.map((option) => {
           const active = selected.includes(option);
           return (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onToggle(option)}
-              className={`rounded-full px-4 py-2 text-sm font-black transition ${
-                active ? "bg-[#172033] text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-              }`}
-            >
+            <button key={option} type="button" onClick={() => onToggle(option)} className={`rounded-full px-4 py-2 text-sm font-black transition ${active ? "bg-[#172033] text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
               {option}
             </button>
           );
@@ -834,43 +759,40 @@ function ChipSection({ title, options, selected, onToggle }) {
   );
 }
 
-function DateCard({ date, onDelete }) {
+function DateCard({ date, rank, mode, onDelete }) {
   return (
     <div className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {mode === "explore" ? (
+            <>
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 font-black text-white">{date.avatar}</div>
+              <div>
+                <p className="text-sm font-black">{date.user}</p>
+                <p className="text-xs font-semibold text-slate-400">posted a date idea</p>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-2xl bg-orange-100 px-4 py-2 text-sm font-black text-orange-600">#{rank} ranked</div>
+          )}
+        </div>
+        {mode === "myDates" && (
+          <button onClick={() => onDelete(date.id)} className="text-xs font-black text-slate-400 hover:text-red-500">Delete</button>
+        )}
+      </div>
+
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">
-            {date.neighborhood}
-          </p>
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">{date.neighborhood}</p>
           <h2 className="mt-2 text-3xl font-black leading-tight">{date.title}</h2>
-          <p className="mt-2 text-sm font-bold text-slate-500">
-            {date.price} · {date.dateTypes.join(" + ")}
-          </p>
+          <p className="mt-2 text-sm font-bold text-slate-500">{date.price} · {date.dateTypes.join(" + ")}</p>
         </div>
-
-        <div className="flex shrink-0 flex-col items-end gap-2">
-          <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xl font-black text-amber-600">
-            ★ {date.rating}
-          </div>
-          <button
-            onClick={() => onDelete(date.id)}
-            className="text-xs font-black text-slate-400 hover:text-red-500"
-          >
-            Delete
-          </button>
-        </div>
+        <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xl font-black text-amber-600">★ {date.rating}</div>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
         {date.vibes.map((vibe) => (
-          <span
-            key={vibe}
-            className={`rounded-full px-3 py-1 text-xs font-black ${
-              vibeColors[vibe] || "bg-slate-100 text-slate-700"
-            }`}
-          >
-            #{vibe}
-          </span>
+          <span key={vibe} className={`rounded-full px-3 py-1 text-xs font-black ${vibeColors[vibe] || "bg-slate-100 text-slate-700"}`}>#{vibe}</span>
         ))}
       </div>
 
@@ -878,24 +800,16 @@ function DateCard({ date, onDelete }) {
         {date.places.map((place, idx) => (
           <div key={`${place.name}-${idx}`} className="rounded-2xl bg-slate-50 p-4">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#172033] font-black text-white">
-                {idx + 1}
-              </div>
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#172033] font-black text-white">{idx + 1}</div>
               <div>
                 <h3 className="font-black">{place.name}</h3>
                 <p className="text-sm font-semibold text-slate-500">{place.type}</p>
               </div>
             </div>
-
             {place.ordered.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {place.ordered.map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200"
-                  >
-                    {item}
-                  </span>
+                  <span key={item} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">{item}</span>
                 ))}
               </div>
             )}
