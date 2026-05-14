@@ -389,7 +389,7 @@ const exploreDates = [
 ];
 
 const allVibes = ["Romantic", "Pretty", "Lively", "Cozy", "Dark", "Fun", "Cute", "Daytime", "Artsy", "Fancy", "Casual", "Intimate", "Impressive", "Low Pressure", "Adventurous"];
-const allTypes = ["Dinner", "Drinks", "Cocktails", "Coffee", "Dessert", "Activity", "Walk", "Brunch", "Museum", "Show", "Rooftop"];
+const allTypes = ["Dinner", "Lunch", "Drinks", "Cocktails", "Coffee", "Dessert", "Activity", "Walk", "Brunch", "Museum", "Show", "Rooftop"]; 
 const allNeighborhoods = ["West Loop", "River North", "Loop", "Logan Square", "Wicker Park", "Lincoln Park", "Lakeview", "Gold Coast", "Hyde Park", "Andersonville", "Chinatown", "Ravenswood", "West Town", "Old Town", "Humboldt Park", "Other"];
 const allPrices = ["$", "$$", "$$$", "$$$$"];
 
@@ -419,6 +419,7 @@ function emptyForm() {
     dateTypes: ["Dinner"],
     vibes: ["Romantic"],
     rating: "8.5",
+    estimatedTotalCost: "",
     places: [
       { name: "", type: "Dinner", orderedText: "" },
       { name: "", type: "Drinks", orderedText: "" },
@@ -445,6 +446,8 @@ export default function App() {
   const [selectedPrice, setSelectedPrice] = useState("All");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm());
+  const [likedExploreDates, setLikedExploreDates] = useState({});
+  const [commentBumps, setCommentBumps] = useState({});
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(myDates));
@@ -532,6 +535,7 @@ export default function App() {
       avatar: "Y",
       title: form.title.trim() || "Untitled Date Night",
       neighborhood: form.neighborhood,
+      estimatedTotalCost: form.estimatedTotalCost.trim() || estimateCostFromPrice(form.price),
       price: form.price,
       dateTypes: form.dateTypes,
       vibes: form.vibes,
@@ -556,14 +560,22 @@ export default function App() {
     window.localStorage.removeItem(STORAGE_KEY);
   }
 
+  function toggleExploreLike(id) {
+    setLikedExploreDates((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function addExploreComment(id) {
+    setCommentBumps((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+  }
+
   return (
-    <div className="min-h-screen bg-[#f7f2e9] text-[#172033]">
+    <div className="min-h-screen bg-[#eef7ff] text-[#172033]">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-[#10182A] px-6 py-5 text-white shadow-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 text-xl font-black">D</div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">DateRank Chicago</h1>
+              <h1 className="text-2xl font-black tracking-tight">IT’S A DATE</h1>
               <p className="text-sm text-slate-400">Rank full date nights, not just places.</p>
             </div>
           </div>
@@ -622,7 +634,17 @@ export default function App() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
             {filtered.map((date, index) => (
-              <DateCard key={date.id} date={date} rank={index + 1} mode={activePage} onDelete={deleteDate} />
+              <DateCard
+                key={date.id}
+                date={date}
+                rank={index + 1}
+                mode={activePage}
+                onDelete={deleteDate}
+                isLiked={!!likedExploreDates[date.id]}
+                commentBump={commentBumps[date.id] || 0}
+                onLike={toggleExploreLike}
+                onComment={addExploreComment}
+              />
             ))}
           </div>
         )}
@@ -643,6 +665,9 @@ export default function App() {
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Date title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} placeholder="West Loop dinner + drinks" />
               <Field label="Rating" value={form.rating} onChange={(value) => setForm({ ...form, rating: value })} placeholder="9.2" />
+              <Field label="Estimated Total Cost" value={form.estimatedTotalCost} onChange={(value) => setForm({ ...form, estimatedTotalCost: value })} placeholder="$80–$120" />
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               <Select label="Neighborhood" value={form.neighborhood} onChange={(value) => setForm({ ...form, neighborhood: value })} options={allNeighborhoods} />
               <Select label="Price" value={form.price} onChange={(value) => setForm({ ...form, price: value })} options={allPrices} />
             </div>
@@ -686,6 +711,14 @@ export default function App() {
       )}
     </div>
   );
+}
+
+function estimateCostFromPrice(price) {
+  if (price === "$") return "$20–$50";
+  if (price === "$$") return "$50–$100";
+  if (price === "$$$") return "$100–$180";
+  if (price === "$$$$") return "$180+";
+  return "Not estimated";
 }
 
 function buildKpis(dates) {
@@ -759,7 +792,15 @@ function ChipSection({ title, options, selected, onToggle }) {
   );
 }
 
-function DateCard({ date, rank, mode, onDelete }) {
+function getBaseLikes(id, rank) {
+  return 18 + ((id.length + rank * 7) % 43);
+}
+
+function getBaseComments(id, rank) {
+  return 2 + ((id.length + rank * 3) % 11);
+}
+
+function DateCard({ date, rank, mode, onDelete, isLiked, commentBump = 0, onLike, onComment }) {
   return (
     <div className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -786,6 +827,7 @@ function DateCard({ date, rank, mode, onDelete }) {
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">{date.neighborhood}</p>
           <h2 className="mt-2 text-3xl font-black leading-tight">{date.title}</h2>
           <p className="mt-2 text-sm font-bold text-slate-500">{date.price} · {date.dateTypes.join(" + ")}</p>
+          <p className="mt-1 text-sm font-bold text-emerald-600">Estimated total: {date.estimatedTotalCost || estimateCostFromPrice(date.price)}</p>
         </div>
         <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xl font-black text-amber-600">★ {date.rating}</div>
       </div>
@@ -821,6 +863,23 @@ function DateCard({ date, rank, mode, onDelete }) {
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-300">Notes</p>
         <p className="mt-3 text-sm leading-6 text-slate-200">{date.notes}</p>
       </div>
+
+      {mode === "explore" && (
+        <div className="mt-5 flex gap-3">
+          <button
+            onClick={() => onLike(date.id)}
+            className={`rounded-2xl px-4 py-2 text-sm font-black transition ${isLiked ? "bg-pink-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-pink-50 hover:text-pink-600"}`}
+          >
+            {isLiked ? "♥" : "♡"} {getBaseLikes(date.id, rank) + (isLiked ? 1 : 0)} likes
+          </button>
+          <button
+            onClick={() => onComment(date.id)}
+            className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600 hover:bg-slate-200"
+          >
+            💬 {getBaseComments(date.id, rank) + commentBump} comments
+          </button>
+        </div>
+      )}
     </div>
   );
 }
