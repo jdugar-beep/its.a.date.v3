@@ -509,9 +509,7 @@ export default function App() {
   }
 
   const exploreFeedDates = useMemo(() => [...publicExploreDates, ...exploreDates], [publicExploreDates]);
-  const currentDates = activePage === "myDates"
-  ? myDates
-  : publicExploreDates;
+  const currentDates = activePage === "myDates" ? myDates : exploreFeedDates;
   
   const enrichedDates = useMemo(() => {
     return currentDates.map((date, index) => {
