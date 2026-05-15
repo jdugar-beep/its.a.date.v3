@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { supabase } from "./utils/supabase";
+import { supabase } from "./utils/supabase.js";
 
 export default function AuthBox({ user, setUser }) {
   const [email, setEmail] = useState("");
