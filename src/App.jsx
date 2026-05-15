@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from "./utils/supabase";
 
 const STORAGE_KEY = "daterank_my_dates_v3";
 const SAVED_EXPLORE_KEY = "daterank_saved_explore_v1";
@@ -185,6 +186,7 @@ function safeLoad(key, fallback) {
 
 export default function App() {
   const [activePage, setActivePage] = useState("myDates");
+  const [user, setUser] = useState(null);
   const [myDates, setMyDates] = useState(() => safeLoad(STORAGE_KEY, []));
   const [savedExplore, setSavedExplore] = useState(() => safeLoad(SAVED_EXPLORE_KEY, {}));
   const [selectedVibe, setSelectedVibe] = useState("All");
@@ -205,6 +207,20 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(SAVED_EXPLORE_KEY, JSON.stringify(savedExplore));
   }, [savedExplore]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const currentDates = activePage === "myDates" ? myDates : exploreDates;
 
@@ -399,6 +415,7 @@ export default function App() {
             <button onClick={() => setIsModalOpen(true)} className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg hover:bg-orange-600">
               + Add Date
             </button>
+            <AuthBox user={user} setUser={setUser} />
           </div>
 
           <button onClick={() => setIsModalOpen(true)} className="rounded-2xl bg-orange-500 px-4 py-3 text-sm font-black text-white shadow-lg md:hidden">
@@ -539,6 +556,100 @@ export default function App() {
           </form>
         </div>
       )}
+    </div>
+  );
+}
+
+function AuthBox({ user, setUser }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  async function signUp() {
+    if (!email || !password) {
+      alert("Please enter an email and password.");
+      return;
+    }
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      alert("Check your email to confirm signup!");
+    }
+  }
+
+  async function logIn() {
+    if (!email || !password) {
+      alert("Please enter an email and password.");
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      setUser(data.user);
+      setEmail("");
+      setPassword("");
+    }
+  }
+
+  async function logOut() {
+    await supabase.auth.signOut();
+    setUser(null);
+  }
+
+  if (user) {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="max-w-[220px] truncate rounded-xl bg-white/10 px-3 py-2 text-sm font-bold text-white">
+          {user.email}
+        </div>
+        <button
+          onClick={logOut}
+          className="rounded-xl bg-white px-3 py-2 text-xs font-black text-[#10182A]"
+        >
+          Log out
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        className="w-36 rounded-xl px-3 py-2 text-sm text-slate-900 outline-none"
+      />
+      <input
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+        type="password"
+        className="w-32 rounded-xl px-3 py-2 text-sm text-slate-900 outline-none"
+      />
+      <button
+        onClick={logIn}
+        className="rounded-xl bg-orange-500 px-3 py-2 text-xs font-black text-white"
+      >
+        Log in
+      </button>
+      <button
+        onClick={signUp}
+        className="rounded-xl bg-white px-3 py-2 text-xs font-black text-[#10182A]"
+      >
+        Sign up
+      </button>
     </div>
   );
 }
