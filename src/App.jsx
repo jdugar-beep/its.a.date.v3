@@ -239,6 +239,15 @@ export default function App() {
   const [exploreLikeCounts, setExploreLikeCounts] = useState({});
   const [comments, setComments] = useState({});
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [followersList, setFollowersList] = useState([]);
+  const [followingList, setFollowingList] = useState([]);
+  const [connectionsModal, setConnectionsModal] = useState(null);
+  const [peopleSearch, setPeopleSearch] = useState("");
+  const [peopleResults, setPeopleResults] = useState([]);
+  const [viewingProfile, setViewingProfile] = useState(null);
+  const [viewingProfileDates, setViewingProfileDates] = useState([]);
+  const [viewingProfileLoading, setViewingProfileLoading] = useState(false);
+  const [publicExploreDates, setPublicExploreDates] = useState([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user || null));
@@ -250,6 +259,9 @@ export default function App() {
       if (!session?.user) {
         setMyDates([]);
         setProfile(null);
+        setFollowersList([]);
+        setFollowingList([]);
+        setViewingProfile(null);
       }
     });
 
@@ -260,7 +272,8 @@ export default function App() {
     if (!user) return;
     loadMyDates();
     loadProfile();
-    loadExploreEngagement();
+    loadPublicExploreDates();
+    loadSocialData();
   }, [user]);
 
   async function loadProfile() {
@@ -320,6 +333,105 @@ export default function App() {
     }
   }
 
+  async function loadSocialData() {
+    const { data: follows, error } = await supabase
+      .from("follows")
+      .select("*")
+      .or(`follower_id.eq.${user.id},following_id.eq.${user.id}`);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const followerIds = (follows || []).filter((f) => f.following_id === user.id).map((f) => f.follower_id);
+    const followingIds = (follows || []).filter((f) => f.follower_id === user.id).map((f) => f.following_id);
+    const allIds = [...new Set([...followerIds, ...followingIds])];
+
+    if (!allIds.length) {
+      setFollowersList([]);
+      setFollowingList([]);
+      return;
+    }
+
+    const { data: profilesData, error: profileError } = await supabase.from("profiles").select("*").in("id", allIds);
+
+    if (profileError) {
+      console.error(profileError);
+      return;
+    }
+
+    const byId = Object.fromEntries((profilesData || []).map((p) => [p.id, p]));
+    setFollowersList(followerIds.map((id) => byId[id]).filter(Boolean));
+    setFollowingList(followingIds.map((id) => byId[id]).filter(Boolean));
+  }
+
+  async function searchPeople(query = peopleSearch) {
+    const clean = query.trim();
+    if (!clean) {
+      setPeopleResults([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .or(`username.ilike.%${clean}%,display_name.ilike.%${clean}%`)
+      .neq("id", user.id)
+      .limit(20);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setPeopleResults(data || []);
+  }
+
+  async function openPublicProfile(person) {
+    if (!person) return;
+    setConnectionsModal(null);
+    setViewingProfile(person);
+    setViewingProfileLoading(true);
+
+    const { data, error } = await supabase
+      .from("dates")
+      .select("*")
+      .eq("user_id", person.id)
+      .eq("is_public", true)
+      .order("public_at", { ascending: false });
+
+    if (error) {
+      alert(error.message);
+      setViewingProfileDates([]);
+    } else {
+      setViewingProfileDates((data || []).map(rowToDate));
+    }
+
+    setViewingProfileLoading(false);
+  }
+
+  async function toggleFollow(person) {
+    if (!person || person.id === user.id) return;
+    const alreadyFollowing = followingList.some((p) => p.id === person.id);
+
+    if (alreadyFollowing) {
+      const { error } = await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", person.id);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      setFollowingList((prev) => prev.filter((p) => p.id !== person.id));
+    } else {
+      const { error } = await supabase.from("follows").insert({ follower_id: user.id, following_id: person.id });
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      setFollowingList((prev) => [...prev, person]);
+    }
+  }
+
   async function loadMyDates() {
     setLoadingDates(true);
 
@@ -340,8 +452,35 @@ export default function App() {
     setLoadingDates(false);
   }
 
-  async function loadExploreEngagement() {
-    const ids = exploreDates.map((date) => date.id);
+  async function loadPublicExploreDates() {
+    const { data, error } = await supabase
+      .from("dates")
+      .select("*, profiles(display_name, username)")
+      .eq("is_public", true)
+      .order("public_at", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const publicDates = (data || []).map((row) => {
+      const date = rowToDate(row);
+      const displayName = row.profiles?.display_name || row.profiles?.username || "User";
+      return {
+        ...date,
+        user: displayName,
+        avatar: displayName?.[0]?.toUpperCase() || "U",
+        sourceUserId: row.user_id,
+      };
+    });
+
+    setPublicExploreDates(publicDates);
+    await loadExploreEngagement([...exploreDates, ...publicDates]);
+  }
+
+  async function loadExploreEngagement(sourceDates = [...exploreDates, ...publicExploreDates]) {
+    const ids = sourceDates.map((date) => String(date.id));
 
     const [{ data: likes }, { data: allComments }] = await Promise.all([
       supabase.from("explore_likes").select("*").in("explore_date_id", ids),
@@ -369,7 +508,8 @@ export default function App() {
     setComments(groupedComments);
   }
 
-  const currentDates = activePage === "myDates" ? myDates : exploreDates;
+  const exploreFeedDates = useMemo(() => [...publicExploreDates, ...exploreDates], [publicExploreDates]);
+  const currentDates = activePage === "myDates" ? myDates : exploreFeedDates;
 
   const enrichedDates = useMemo(() => {
     return currentDates.map((date, index) => {
@@ -385,14 +525,14 @@ export default function App() {
   }, [currentDates, activePage, exploreLikeCounts, comments]);
 
   const filterOptions = useMemo(() => {
-    const source = currentDates.length ? currentDates : exploreDates;
+    const source = currentDates.length ? currentDates : exploreFeedDates;
     return {
       vibes: ["All", ...new Set(source.flatMap((p) => p.vibes || []))],
       types: ["All", ...new Set(source.flatMap((p) => p.dateTypes || []))],
       neighborhoods: ["All", ...new Set(source.map((p) => p.neighborhood).filter(Boolean))],
       prices: ["All", ...new Set(source.map((p) => p.price).filter(Boolean))],
     };
-  }, [currentDates]);
+  }, [currentDates, exploreFeedDates]);
 
   const filtered = useMemo(() => {
     const searchText = search.toLowerCase().trim();
@@ -497,6 +637,7 @@ export default function App() {
           estimated_total_cost: payload.estimatedTotalCost,
           places: payload.places,
           notes: payload.notes,
+          is_public: editingDate.isPublic || false,
         })
         .eq("id", editingDate.id)
         .eq("user_id", user.id)
@@ -523,6 +664,7 @@ export default function App() {
           estimated_total_cost: payload.estimatedTotalCost,
           places: payload.places,
           notes: payload.notes,
+          is_public: false,
         })
         .select()
         .single();
@@ -559,6 +701,30 @@ export default function App() {
       return;
     }
     setMyDates([]);
+  }
+
+  async function togglePostToExplore(date) {
+    const nextPublic = !date.isPublic;
+    const { data, error } = await supabase
+      .from("dates")
+      .update({
+        is_public: nextPublic,
+        public_at: nextPublic ? new Date().toISOString() : null,
+      })
+      .eq("id", date.id)
+      .eq("user_id", user.id)
+      .select()
+      .single();
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const updatedDate = rowToDate(data);
+    setMyDates((prev) => prev.map((item) => (item.id === date.id ? updatedDate : item)));
+    await loadPublicExploreDates();
+    alert(nextPublic ? "Posted to Explore!" : "Removed from Explore.");
   }
 
   async function toggleExploreLike(id) {
@@ -621,6 +787,7 @@ export default function App() {
         estimated_total_cost: copied.estimatedTotalCost || estimateCostFromPrice(copied.price),
         places: copied.places,
         notes: copied.notes,
+        is_public: false,
       })
       .select()
       .single();
@@ -697,6 +864,30 @@ export default function App() {
           </div>
         </section>
 
+        {activePage === "myDates" && !viewingProfile && (
+          <SocialHeaderCard
+            profile={profile}
+            followersCount={followersList.length}
+            followingCount={followingList.length}
+            onFollowers={() => setConnectionsModal("followers")}
+            onFollowing={() => setConnectionsModal("following")}
+            onFindPeople={() => setConnectionsModal("find")}
+            onEditProfile={() => setIsProfileOpen(true)}
+          />
+        )}
+
+        {viewingProfile ? (
+          <PublicProfilePage
+            person={viewingProfile}
+            dates={viewingProfileDates}
+            loading={viewingProfileLoading}
+            isFollowing={followingList.some((p) => p.id === viewingProfile.id)}
+            onBack={() => { setViewingProfile(null); setViewingProfileDates([]); }}
+            onToggleFollow={() => toggleFollow(viewingProfile)}
+          />
+        ) : (
+          <>
+
         <section className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
           <KpiCard label={activePage === "myDates" ? "Dates logged" : "Explore posts"} value={kpis.count} helper={activePage === "myDates" ? "Your saved date nights" : "Public inspo posts"} />
           <KpiCard label="Neighborhoods" value={kpis.neighborhoods} helper="Unique areas represented" />
@@ -733,6 +924,7 @@ export default function App() {
                 mode={activePage}
                 onDelete={deleteDate}
                 onEdit={openEditModal}
+                onTogglePost={togglePostToExplore}
                 isLiked={!!likedExploreDates[date.id]}
                 onLike={toggleExploreLike}
                 onAddToMine={addExploreToMyDates}
@@ -741,6 +933,8 @@ export default function App() {
               />
             ))}
           </div>
+        )}
+          </>
         )}
       </main>
 
@@ -771,6 +965,175 @@ export default function App() {
           onClose={() => setIsProfileOpen(false)}
           onSave={updateProfile}
         />
+      )}
+
+      {connectionsModal && (
+        <ConnectionsModal
+          type={connectionsModal}
+          followers={followersList}
+          following={followingList}
+          peopleSearch={peopleSearch}
+          setPeopleSearch={setPeopleSearch}
+          peopleResults={peopleResults}
+          onSearch={searchPeople}
+          onClose={() => setConnectionsModal(null)}
+          onOpenProfile={openPublicProfile}
+          isFollowing={(person) => followingList.some((p) => p.id === person.id)}
+          onToggleFollow={toggleFollow}
+        />
+      )}
+    </div>
+  );
+}
+
+
+function SocialHeaderCard({ profile, followersCount, followingCount, onFollowers, onFollowing, onFindPeople, onEditProfile }) {
+  return (
+    <section className="mb-5 rounded-[2rem] bg-white p-5 shadow-sm ring-1 ring-slate-200 md:p-6">
+      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-pink-500 text-2xl font-black text-white shadow-lg">
+            {profile?.display_name?.[0]?.toUpperCase() || profile?.username?.[0]?.toUpperCase() || "Y"}
+          </div>
+          <div>
+            <h3 className="text-2xl font-black">{profile?.display_name || "Your profile"}</h3>
+            <p className="text-sm font-bold text-slate-500">@{profile?.username || "username"}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center">
+          <button onClick={onFollowers} className="rounded-2xl bg-slate-50 px-5 py-4 text-left ring-1 ring-slate-200 hover:bg-slate-100">
+            <div className="text-2xl font-black text-[#172033]">{followersCount}</div>
+            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Followers</div>
+          </button>
+          <button onClick={onFollowing} className="rounded-2xl bg-slate-50 px-5 py-4 text-left ring-1 ring-slate-200 hover:bg-slate-100">
+            <div className="text-2xl font-black text-[#172033]">{followingCount}</div>
+            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Following</div>
+          </button>
+          <button onClick={onFindPeople} className="rounded-2xl bg-[#172033] px-5 py-4 text-sm font-black text-white hover:bg-slate-700 sm:ml-2">
+            Find people
+          </button>
+          <button onClick={onEditProfile} className="rounded-2xl bg-orange-500 px-5 py-4 text-sm font-black text-white hover:bg-orange-600">
+            Edit profile
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ConnectionsModal({ type, followers, following, peopleSearch, setPeopleSearch, peopleResults, onSearch, onClose, onOpenProfile, isFollowing, onToggleFollow }) {
+  const list = type === "followers" ? followers : type === "following" ? following : peopleResults;
+  const title = type === "followers" ? "Followers" : type === "following" ? "Following" : "Find people";
+  const emptyText = type === "find" ? "Search for usernames or display names." : `No ${title.toLowerCase()} yet.`;
+
+  function submitSearch(e) {
+    e.preventDefault();
+    onSearch(peopleSearch);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">Social</p>
+            <h2 className="mt-2 text-3xl font-black">{title}</h2>
+          </div>
+          <button onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-100 text-xl font-black hover:bg-slate-200">×</button>
+        </div>
+
+        {type === "find" && (
+          <form onSubmit={submitSearch} className="mt-5 flex gap-2">
+            <input value={peopleSearch} onChange={(e) => setPeopleSearch(e.target.value)} placeholder="Search username or name..." className="min-w-0 flex-1 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400" />
+            <button className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white hover:bg-orange-600">Search</button>
+          </form>
+        )}
+
+        <div className="mt-5 space-y-3">
+          {list.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 p-6 text-center font-bold text-slate-500 ring-1 ring-slate-200">{emptyText}</div>
+          ) : (
+            list.map((person) => (
+              <PersonRow key={person.id} person={person} onOpenProfile={onOpenProfile} isFollowing={isFollowing(person)} onToggleFollow={onToggleFollow} />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PersonRow({ person, onOpenProfile, isFollowing, onToggleFollow }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+      <button onClick={() => onOpenProfile(person)} className="flex min-w-0 items-center gap-3 text-left">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 font-black text-white">
+          {person.display_name?.[0]?.toUpperCase() || person.username?.[0]?.toUpperCase() || "U"}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate font-black text-[#172033]">{person.display_name || person.username || "User"}</p>
+          <p className="truncate text-sm font-bold text-slate-500">@{person.username || "username"}</p>
+        </div>
+      </button>
+      <button onClick={() => onToggleFollow(person)} className={`shrink-0 rounded-2xl px-4 py-2 text-xs font-black ${isFollowing ? "bg-slate-200 text-slate-700 hover:bg-slate-300" : "bg-[#172033] text-white hover:bg-slate-700"}`}>
+        {isFollowing ? "Following" : "Follow"}
+      </button>
+    </div>
+  );
+}
+
+function PublicProfilePage({ person, dates, loading, isFollowing, onBack, onToggleFollow }) {
+  const kpis = buildKpis(dates);
+
+  return (
+    <div>
+      <button onClick={onBack} className="mb-4 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">
+        ← Back to your dates
+      </button>
+
+      <section className="mb-5 overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="bg-gradient-to-br from-[#172033] to-[#26395f] p-6 text-white">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-pink-500 text-2xl font-black text-white shadow-lg">
+                {person.display_name?.[0]?.toUpperCase() || person.username?.[0]?.toUpperCase() || "U"}
+              </div>
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-300">Profile</p>
+                <h2 className="mt-2 text-3xl font-black md:text-5xl">{person.display_name || person.username}</h2>
+                <p className="mt-1 text-sm font-bold text-slate-300">@{person.username}</p>
+              </div>
+            </div>
+            <button onClick={onToggleFollow} className={`rounded-2xl px-6 py-4 font-black ${isFollowing ? "bg-white text-[#172033]" : "bg-orange-500 text-white hover:bg-orange-600"}`}>
+              {isFollowing ? "Following" : "Follow"}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+        <KpiCard label="Dates" value={kpis.count} helper="Public date rankings" />
+        <KpiCard label="Neighborhoods" value={kpis.neighborhoods} helper="Unique areas represented" />
+        <KpiCard label="Average rating" value={kpis.averageRating} helper="Across their dates" />
+        <KpiCard label="Top vibe" value={kpis.topVibe} helper="Most common tag" />
+      </section>
+
+      {loading ? (
+        <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
+          <h3 className="text-2xl font-black">Loading profile...</h3>
+        </div>
+      ) : dates.length === 0 ? (
+        <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
+          <h3 className="text-2xl font-black">No dates yet</h3>
+          <p className="mt-2 text-slate-500">This person has not logged any visible dates yet.</p>
+        </div>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-2">
+          {dates.map((date, index) => (
+            <DateCard key={date.id} date={date} rank={index + 1} mode="public" onDelete={() => {}} onEdit={() => {}} isLiked={false} onLike={() => {}} onAddToMine={() => {}} comments={[]} onComment={() => {}} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -1046,6 +1409,9 @@ function rowToDate(row) {
     places: row.places || [],
     notes: row.notes,
     created_at: row.created_at,
+    isPublic: !!row.is_public,
+    publicAt: row.public_at,
+    sourceUserId: row.user_id,
   };
 }
 
@@ -1128,7 +1494,7 @@ function getBaseComments(id, rank) {
   return 2 + ((id.length + rank * 3) % 11);
 }
 
-function DateCard({ date, rank, mode, onDelete, onEdit, isLiked, onLike, onAddToMine, comments, onComment }) {
+function DateCard({ date, rank, mode, onDelete, onEdit, onTogglePost, isLiked, onLike, onAddToMine, comments, onComment }) {
   const [commentText, setCommentText] = useState("");
   const isExplore = mode === "explore";
 
@@ -1156,7 +1522,10 @@ function DateCard({ date, rank, mode, onDelete, onEdit, isLiked, onLike, onAddTo
           </div>
 
           {mode === "myDates" && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
+              <button onClick={() => onTogglePost(date)} className={`rounded-xl px-3 py-2 text-xs font-black ${date.isPublic ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-orange-100 text-orange-700 hover:bg-orange-200"}`}>
+                {date.isPublic ? "Posted" : "Post to Explore"}
+              </button>
               <button onClick={() => onEdit(date)} className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-200">Edit</button>
               <button onClick={() => onDelete(date.id)} className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-500 hover:bg-red-100">Delete</button>
             </div>
@@ -1169,6 +1538,7 @@ function DateCard({ date, rank, mode, onDelete, onEdit, isLiked, onLike, onAddTo
             <h2 className="mt-2 text-3xl font-black leading-tight">{date.title}</h2>
             <p className="mt-2 text-sm font-bold text-slate-500">{date.price} · {date.dateTypes.join(" + ")}</p>
             <p className="mt-1 text-sm font-bold text-emerald-600">Estimated total: {date.estimatedTotalCost || estimateCostFromPrice(date.price)}</p>
+            {mode === "myDates" && date.isPublic && <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-orange-500">Posted on Explore</p>}
           </div>
           <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xl font-black text-amber-600">★ {date.rating}</div>
         </div>
