@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./utils/supabase.js";
 
-const STORAGE_KEY = "daterank_my_dates_v3";
 const SAVED_EXPLORE_KEY = "daterank_saved_explore_v1";
 const exploreDates = [
   {
@@ -183,11 +182,46 @@ function safeLoad(key, fallback) {
   }
 }
 
+function normalizeDbDate(row) {
+  return {
+    id: row.id,
+    user: "You",
+    avatar: "Y",
+    title: row.title || "Untitled Date Night",
+    neighborhood: row.neighborhood || "Other",
+    price: row.price || "$$",
+    dateTypes: row.date_types || [],
+    vibes: row.vibes || [],
+    rating: Number(row.rating || 0),
+    estimatedTotalCost: row.estimated_total_cost || estimateCostFromPrice(row.price || "$$"),
+    places: Array.isArray(row.places) ? row.places : [],
+    notes: row.notes || "No notes yet.",
+    createdAt: row.created_at,
+  };
+}
+
+function buildDatePayload(date, userId) {
+  return {
+    user_id: userId,
+    title: date.title,
+    neighborhood: date.neighborhood,
+    price: date.price,
+    date_types: date.dateTypes,
+    vibes: date.vibes,
+    rating: Number(date.rating || 0),
+    estimated_total_cost: date.estimatedTotalCost || estimateCostFromPrice(date.price),
+    places: date.places || [],
+    notes: date.notes || "No notes yet.",
+  };
+}
+
 export default function App() {
   const [activePage, setActivePage] = useState("myDates");
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [myDates, setMyDates] = useState(() => safeLoad(STORAGE_KEY, []));
+  const [myDates, setMyDates] = useState([]);
+  const [datesLoading, setDatesLoading] = useState(false);
+  const [datesError, setDatesError] = useState("");
   const [savedExplore, setSavedExplore] = useState(() => safeLoad(SAVED_EXPLORE_KEY, {}));
   const [selectedVibe, setSelectedVibe] = useState("All");
   const [selectedType, setSelectedType] = useState("All");
@@ -199,10 +233,6 @@ export default function App() {
   const [form, setForm] = useState(emptyForm());
   const [likedExploreDates, setLikedExploreDates] = useState({});
   const [comments, setComments] = useState({});
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(myDates));
-  }, [myDates]);
 
   useEffect(() => {
     window.localStorage.setItem(SAVED_EXPLORE_KEY, JSON.stringify(savedExplore));
@@ -229,6 +259,43 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setMyDates([]);
+      return;
+    }
+
+    let mounted = true;
+
+    async function loadMyDates() {
+      setDatesLoading(true);
+      setDatesError("");
+
+      const { data, error } = await supabase
+        .from("dates")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!mounted) return;
+
+      if (error) {
+        console.error(error);
+        setDatesError(error.message);
+        setMyDates([]);
+      } else {
+        setMyDates((data || []).map(normalizeDbDate));
+      }
+
+      setDatesLoading(false);
+    }
+
+    loadMyDates();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   const currentDates = activePage === "myDates" ? myDates : exploreDates;
 
@@ -328,8 +395,13 @@ export default function App() {
     }));
   }
 
-  function submitDate(e) {
+  async function submitDate(e) {
     e.preventDefault();
+
+    if (!user) {
+      alert("Please log in first.");
+      return;
+    }
 
     const cleanPlaces = form.places
       .filter((place) => place.name.trim())
@@ -340,7 +412,6 @@ export default function App() {
       }));
 
     const newDate = {
-      id: `my-${Date.now()}`,
       user: "You",
       avatar: "Y",
       title: form.title.trim() || "Untitled Date Night",
@@ -354,20 +425,51 @@ export default function App() {
       notes: form.notes.trim() || "No notes yet.",
     };
 
-    setMyDates((prev) => [newDate, ...prev]);
+    const { data, error } = await supabase
+      .from("dates")
+      .insert(buildDatePayload(newDate, user.id))
+      .select()
+      .single();
+
+    if (error) {
+      console.error(error);
+      alert(`Could not save date: ${error.message}`);
+      return;
+    }
+
+    setMyDates((prev) => [normalizeDbDate(data), ...prev]);
     setForm(emptyForm());
     setIsModalOpen(false);
     setActivePage("myDates");
     resetFilters();
   }
 
-  function deleteDate(id) {
+  async function deleteDate(id) {
+    const previousDates = myDates;
     setMyDates((prev) => prev.filter((date) => date.id !== id));
+
+    const { error } = await supabase.from("dates").delete().eq("id", id);
+
+    if (error) {
+      console.error(error);
+      setMyDates(previousDates);
+      alert(`Could not delete date: ${error.message}`);
+    }
   }
 
-  function clearMyDates() {
+  async function clearMyDates() {
+    if (!window.confirm("Delete all of your saved dates?")) return;
+
+    const previousDates = myDates;
     setMyDates([]);
-    window.localStorage.removeItem(STORAGE_KEY);
+
+    const { error } = await supabase.from("dates").delete().eq("user_id", user.id);
+
+    if (error) {
+      console.error(error);
+      setMyDates(previousDates);
+      alert(`Could not clear dates: ${error.message}`);
+    }
   }
 
   function toggleExploreLike(id) {
@@ -387,20 +489,39 @@ export default function App() {
     }));
   }
 
-  function addExploreToMyDates(date) {
+  async function addExploreToMyDates(date) {
+    if (!user) {
+      alert("Please log in first.");
+      return;
+    }
+
     const copiedDate = {
-      ...date,
-      id: `my-${Date.now()}`,
       user: "You",
       avatar: "Y",
+      title: date.title,
+      neighborhood: date.neighborhood,
+      estimatedTotalCost: date.estimatedTotalCost || estimateCostFromPrice(date.price),
+      price: date.price,
+      dateTypes: date.dateTypes,
+      vibes: date.vibes,
+      rating: Number(date.rating) || 8,
+      places: date.places || [],
       notes: `${date.notes} Saved from Explore.`,
     };
 
-    delete copiedDate.likeCount;
-    delete copiedDate.commentCount;
-    delete copiedDate.saved;
+    const { data, error } = await supabase
+      .from("dates")
+      .insert(buildDatePayload(copiedDate, user.id))
+      .select()
+      .single();
 
-    setMyDates((prev) => [copiedDate, ...prev]);
+    if (error) {
+      console.error(error);
+      alert(`Could not save date: ${error.message}`);
+      return;
+    }
+
+    setMyDates((prev) => [normalizeDbDate(data), ...prev]);
     setActivePage("myDates");
     resetFilters();
   }
@@ -489,7 +610,17 @@ export default function App() {
           </div>
         )}
 
-        {activePage === "myDates" && myDates.length === 0 ? (
+        {activePage === "myDates" && datesLoading ? (
+          <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
+            <h3 className="text-2xl font-black">Loading your saved dates...</h3>
+            <p className="mt-2 text-slate-500">Pulling your dates from Supabase.</p>
+          </div>
+        ) : activePage === "myDates" && datesError ? (
+          <div className="rounded-[2rem] bg-red-50 p-10 text-center text-red-700 shadow-sm ring-1 ring-red-200">
+            <h3 className="text-2xl font-black">Could not load your dates</h3>
+            <p className="mt-2 text-sm font-semibold">{datesError}</p>
+          </div>
+        ) : activePage === "myDates" && myDates.length === 0 ? (
           <EmptyMyDates onAdd={() => setIsModalOpen(true)} onExplore={() => setActivePage("explore")} />
         ) : filtered.length === 0 ? (
           <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
