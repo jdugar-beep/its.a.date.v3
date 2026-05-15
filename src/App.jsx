@@ -138,11 +138,98 @@ const exploreDates = [
     ],
     notes: "Feels like a movie. Best when the weather is nice enough for a walk after.",
   },
+
+  {
+    id: "explore-nyc-westvillage-dante",
+    city: "New York",
+    user: "Ari",
+    avatar: "A",
+    title: "West Village Dinner + Drinks",
+    neighborhood: "West Village",
+    price: "$$$",
+    dateTypes: ["Dinner", "Cocktails"],
+    vibes: ["Romantic", "Pretty", "Lively"],
+    rating: 9.5,
+    estimatedTotalCost: "$140–$220",
+    places: [
+      { name: "Via Carota", type: "Dinner", ordered: ["Cacio e pepe", "Insalata verde"] },
+      { name: "Dante", type: "Cocktails", ordered: ["Negroni", "Martini"] },
+    ],
+    notes: "Classic NYC date energy. Romantic, walkable, and easy to keep the night going.",
+  },
+  {
+    id: "explore-nyc-les-dimes",
+    city: "New York",
+    user: "Nina",
+    avatar: "N",
+    title: "Lower East Side Low-Key Night",
+    neighborhood: "Lower East Side",
+    price: "$$",
+    dateTypes: ["Dinner", "Drinks"],
+    vibes: ["Fun", "Casual", "Low Pressure"],
+    rating: 8.8,
+    estimatedTotalCost: "$70–$120",
+    places: [
+      { name: "Dimes", type: "Dinner", ordered: ["Market bowl", "Fries"] },
+      { name: "169 Bar", type: "Drinks", ordered: ["House cocktails"] },
+    ],
+    notes: "Great for a casual date that still feels very New York.",
+  },
+  {
+    id: "explore-nyc-brooklyn-park",
+    city: "New York",
+    user: "Leo",
+    avatar: "L",
+    title: "Brooklyn Day Date",
+    neighborhood: "Williamsburg",
+    price: "$$",
+    dateTypes: ["Coffee", "Walk", "Activity"],
+    vibes: ["Cute", "Daytime", "Artsy"],
+    rating: 8.9,
+    estimatedTotalCost: "$40–$90",
+    places: [
+      { name: "Devoción", type: "Coffee", ordered: ["Latte"] },
+      { name: "Domino Park", type: "Walk", ordered: [] },
+      { name: "Artists & Fleas", type: "Activity", ordered: [] },
+    ],
+    notes: "Cute daytime option with lots of easy conversation starters.",
+  },
+  {
+    id: "explore-nyc-soho-dessert",
+    city: "New York",
+    user: "Mina",
+    avatar: "M",
+    title: "SoHo Shopping + Dessert",
+    neighborhood: "SoHo",
+    price: "$$",
+    dateTypes: ["Activity", "Dessert"],
+    vibes: ["Pretty", "Cute", "Casual"],
+    rating: 8.6,
+    estimatedTotalCost: "$50–$100",
+    places: [
+      { name: "SoHo shops", type: "Activity", ordered: [] },
+      { name: "Dominique Ansel Bakery", type: "Dessert", ordered: ["DKA", "Cronut"] },
+    ],
+    notes: "Light, low-pressure, and good when you want something besides a formal dinner.",
+  },
 ];
 
 const allVibes = ["Romantic", "Pretty", "Lively", "Cozy", "Dark", "Fun", "Cute", "Daytime", "Artsy", "Fancy", "Casual", "Intimate", "Impressive", "Low Pressure", "Adventurous"];
 const allTypes = ["Dinner", "Lunch", "Drinks", "Cocktails", "Coffee", "Dessert", "Activity", "Walk", "Brunch", "Museum", "Show", "Rooftop"];
-const allNeighborhoods = ["West Loop", "River North", "Loop", "Logan Square", "Wicker Park", "Lincoln Park", "Lakeview", "Gold Coast", "Hyde Park", "Andersonville", "Chinatown", "Ravenswood", "West Town", "Old Town", "Humboldt Park", "Other"];
+const cities = ["Chicago", "New York"];
+
+const neighborhoodsByCity = {
+  Chicago: ["West Loop", "River North", "Loop", "Logan Square", "Wicker Park", "Lincoln Park", "Lakeview", "Gold Coast", "Hyde Park", "Andersonville", "Chinatown", "Ravenswood", "West Town", "Old Town", "Humboldt Park", "Other"],
+  "New York": ["West Village", "SoHo", "Lower East Side", "Williamsburg", "Greenwich Village", "East Village", "Chelsea", "Flatiron", "Tribeca", "Upper West Side", "Upper East Side", "DUMBO", "Park Slope", "Bushwick", "Astoria", "Other"],
+};
+
+function getNeighborhoodsForCity(city) {
+  return neighborhoodsByCity[city] || neighborhoodsByCity.Chicago;
+}
+
+function getDefaultNeighborhood(city) {
+  return getNeighborhoodsForCity(city)[0] || "Other";
+}
 const allPrices = ["$", "$$", "$$$", "$$$$"];
 
 const vibeColors = {
@@ -163,10 +250,11 @@ const vibeColors = {
   Adventurous: "bg-lime-100 text-lime-700",
 };
 
-function emptyForm() {
+function emptyForm(city = "Chicago") {
   return {
+    city,
     title: "",
-    neighborhood: "West Loop",
+    neighborhood: getDefaultNeighborhood(city),
     price: "$$",
     dateTypes: ["Dinner"],
     vibes: ["Romantic"],
@@ -181,9 +269,11 @@ function emptyForm() {
 }
 
 function formFromDate(date) {
+  const city = date.city || "Chicago";
   return {
+    city,
     title: date.title || "",
-    neighborhood: date.neighborhood || "West Loop",
+    neighborhood: date.neighborhood || getDefaultNeighborhood(city),
     price: date.price || "$$",
     dateTypes: date.dateTypes || ["Dinner"],
     vibes: date.vibes || ["Romantic"],
@@ -208,6 +298,7 @@ function cleanDatePayload(form) {
     }));
 
   return {
+    city: form.city || "Chicago",
     title: form.title.trim() || "Untitled Date Night",
     neighborhood: form.neighborhood,
     estimatedTotalCost: form.estimatedTotalCost.trim() || estimateCostFromPrice(form.price),
@@ -222,6 +313,7 @@ function cleanDatePayload(form) {
 
 export default function App() {
   const [activePage, setActivePage] = useState("myDates");
+  const [selectedCity, setSelectedCity] = useState(() => window.localStorage.getItem("itsadate_selected_city") || "Chicago");
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [myDates, setMyDates] = useState([]);
@@ -234,7 +326,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDate, setEditingDate] = useState(null);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState(() => emptyForm(selectedCity));
   const [likedExploreDates, setLikedExploreDates] = useState({});
   const [exploreLikeCounts, setExploreLikeCounts] = useState({});
   const [comments, setComments] = useState({});
@@ -269,12 +361,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    window.localStorage.setItem("itsadate_selected_city", selectedCity);
+    setSelectedNeighborhood("All");
+    setViewingProfile(null);
+    setViewingProfileDates([]);
+  }, [selectedCity]);
+
+  useEffect(() => {
     if (!user) return;
     loadMyDates();
     loadProfile();
     loadPublicExploreDates();
     loadSocialData();
-  }, [user]);
+  }, [user, selectedCity]);
 
   async function loadProfile() {
     const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
@@ -399,6 +498,7 @@ export default function App() {
       .select("*")
       .eq("user_id", person.id)
       .eq("is_public", true)
+      .eq("city", selectedCity)
       .order("public_at", { ascending: false });
 
     if (error) {
@@ -461,6 +561,7 @@ export default function App() {
       .from("dates")
       .select("*")
       .eq("user_id", user.id)
+      .eq("city", selectedCity)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -479,6 +580,7 @@ export default function App() {
       .from("dates")
       .select("*")
       .eq("is_public", true)
+      .eq("city", selectedCity)
       .order("public_at", { ascending: false, nullsFirst: false });
 
     if (error) {
@@ -517,10 +619,10 @@ export default function App() {
     });
 
     setPublicExploreDates(publicDates);
-    await loadExploreEngagement([...exploreDates, ...publicDates]);
+    await loadExploreEngagement([...(exploreDates || []).filter((date) => (date.city || "Chicago") === selectedCity), ...publicDates]);
   }
 
-  async function loadExploreEngagement(sourceDates = [...exploreDates, ...publicExploreDates]) {
+  async function loadExploreEngagement(sourceDates = [...(exploreDates || []).filter((date) => (date.city || "Chicago") === selectedCity), ...publicExploreDates]) {
     const ids = sourceDates.map((date) => String(date.id));
 
     const [{ data: likes }, { data: allComments }] = await Promise.all([
@@ -554,9 +656,14 @@ export default function App() {
     return publicExploreDates.filter((date) => followingIds.has(date.sourceUserId));
   }, [publicExploreDates, followingList]);
 
+  const demoExploreDatesForCity = useMemo(
+    () => (exploreDates || []).filter((date) => (date.city || "Chicago") === selectedCity),
+    [selectedCity]
+  );
+
   const exploreFeedDates = useMemo(
-    () => [...publicExploreDates, ...(exploreDates || [])],
-    [publicExploreDates]
+    () => [...publicExploreDates, ...demoExploreDatesForCity],
+    [publicExploreDates, demoExploreDatesForCity]
   );
 
   const currentDates =
@@ -584,10 +691,10 @@ export default function App() {
     return {
       vibes: ["All", ...new Set(source.flatMap((p) => p.vibes || []))],
       types: ["All", ...new Set(source.flatMap((p) => p.dateTypes || []))],
-      neighborhoods: ["All", ...new Set(source.map((p) => p.neighborhood).filter(Boolean))],
+      neighborhoods: ["All", ...new Set([...(source.map((p) => p.neighborhood).filter(Boolean)), ...getNeighborhoodsForCity(selectedCity)])],
       prices: ["All", ...new Set(source.map((p) => p.price).filter(Boolean))],
     };
-  }, [currentDates, exploreFeedDates]);
+  }, [currentDates, exploreFeedDates, selectedCity]);
 
   const filtered = useMemo(() => {
     const searchText = search.toLowerCase().trim();
@@ -632,7 +739,7 @@ export default function App() {
       ? "Track your own dates, edit them anytime, and see them on every device."
       : activePage === "following"
         ? "Keep up with public date ideas posted by accounts you follow."
-        : "Browse Chicago date ideas, like your favorites, comment, or copy them into your own list.";
+        : "Browse date ideas in your selected city, like your favorites, comment, or copy them into your own list.";
   const kpiCountLabel = activePage === "myDates" ? "Dates logged" : activePage === "following" ? "Following posts" : "Explore posts";
   const kpiCountHelper = activePage === "myDates" ? "Your saved date nights" : activePage === "following" ? "From followed accounts" : "Public inspo posts";
 
@@ -646,7 +753,7 @@ export default function App() {
 
   function openAddModal() {
     setEditingDate(null);
-    setForm(emptyForm());
+    setForm(emptyForm(selectedCity));
     setIsModalOpen(true);
   }
 
@@ -694,6 +801,7 @@ export default function App() {
       const { data, error } = await supabase
         .from("dates")
         .update({
+          city: payload.city,
           title: payload.title,
           neighborhood: payload.neighborhood,
           price: payload.price,
@@ -721,6 +829,7 @@ export default function App() {
         .from("dates")
         .insert({
           user_id: user.id,
+          city: payload.city,
           title: payload.title,
           neighborhood: payload.neighborhood,
           price: payload.price,
@@ -744,7 +853,7 @@ export default function App() {
       setMyDates((prev) => [rowToDate(data), ...prev]);
     }
 
-    setForm(emptyForm());
+    setForm(emptyForm(selectedCity));
     setEditingDate(null);
     setIsModalOpen(false);
     setActivePage("myDates");
@@ -846,6 +955,7 @@ export default function App() {
       .from("dates")
       .insert({
         user_id: user.id,
+        city: copied.city || selectedCity,
         title: copied.title,
         neighborhood: copied.neighborhood,
         price: copied.price,
@@ -887,6 +997,7 @@ export default function App() {
           </div>
 
           <div className="hidden flex-wrap items-center gap-2 md:flex">
+            <CitySwitcher selectedCity={selectedCity} onChange={setSelectedCity} />
             <NavButton active={activePage === "myDates"} onClick={() => { setActivePage("myDates"); resetFilters(); }}>Your Dates</NavButton>
             <NavButton active={activePage === "explore"} onClick={() => { setActivePage("explore"); resetFilters(); }}>Explore</NavButton>
             <NavButton active={activePage === "following"} onClick={() => { setActivePage("following"); resetFilters(); }}>Following</NavButton>
@@ -897,6 +1008,7 @@ export default function App() {
           </div>
 
           <div className="flex gap-2 md:hidden">
+            <CitySwitcher selectedCity={selectedCity} onChange={setSelectedCity} compact />
             <button onClick={() => setIsProfileOpen(true)} className="rounded-2xl bg-white/10 px-3 py-3 text-xs font-black text-white">
               {profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"}
             </button>
@@ -910,7 +1022,7 @@ export default function App() {
       <main className="mx-auto max-w-7xl p-3 md:p-6">
         <section className="mb-5 overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-200">
           <div className="bg-gradient-to-br from-[#172033] to-[#26395f] p-5 text-white md:p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-300 md:text-sm">{pageLabel}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-300 md:text-sm">{selectedCity} · {pageLabel}</p>
             <h2 className="mt-2 text-3xl font-black md:text-5xl">
               {pageTitle}
             </h2>
@@ -921,7 +1033,7 @@ export default function App() {
 
           <div className="p-4 md:p-5">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr]">
-              <Field label="Search" value={search} onChange={setSearch} placeholder="Search pasta, romantic, West Loop..." />
+              <Field label="Search" value={search} onChange={setSearch} placeholder={`Search ${selectedCity}, romantic, pasta...`} />
               <Select label="Sort by" value={sortBy} onChange={setSortBy} options={["Highest rated", "Most liked", "Most commented", "Cheapest", "Most expensive", "Newest"]} />
               <Select label="Type" value={selectedType} onChange={setSelectedType} options={filterOptions.types} />
               <Select label="Neighborhood" value={selectedNeighborhood} onChange={setSelectedNeighborhood} options={filterOptions.neighborhoods} />
@@ -963,6 +1075,7 @@ export default function App() {
         {viewingProfile ? (
           <PublicProfilePage
             person={viewingProfile}
+            selectedCity={selectedCity}
             dates={viewingProfileDates}
             loading={viewingProfileLoading}
             isFollowing={followingList.some((p) => p.id === viewingProfile.id)}
@@ -1032,13 +1145,14 @@ export default function App() {
       {isModalOpen && (
         <DateFormModal
           form={form}
+          selectedCity={selectedCity}
           setForm={setForm}
           editingDate={editingDate}
           onSubmit={submitDate}
           onClose={() => {
             setIsModalOpen(false);
             setEditingDate(null);
-            setForm(emptyForm());
+            setForm(emptyForm(selectedCity));
           }}
           toggleArrayValue={toggleArrayValue}
           updatePlace={updatePlace}
@@ -1172,7 +1286,7 @@ function PersonRow({ person, onOpenProfile, isFollowing, onToggleFollow }) {
   );
 }
 
-function PublicProfilePage({ person, dates, loading, isFollowing, onBack, onToggleFollow }) {
+function PublicProfilePage({ person, selectedCity, dates, loading, isFollowing, onBack, onToggleFollow }) {
   const kpis = buildKpis(dates);
 
   return (
@@ -1202,7 +1316,7 @@ function PublicProfilePage({ person, dates, loading, isFollowing, onBack, onTogg
       </section>
 
       <section className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-        <KpiCard label="Dates" value={kpis.count} helper="Public date rankings" />
+        <KpiCard label="Dates" value={kpis.count} helper={`${selectedCity} public rankings`} />
         <KpiCard label="Neighborhoods" value={kpis.neighborhoods} helper="Unique areas represented" />
         <KpiCard label="Average rating" value={kpis.averageRating} helper="Across their dates" />
         <KpiCard label="Top vibe" value={kpis.topVibe} helper="Most common tag" />
@@ -1292,7 +1406,7 @@ function AuthGate() {
             <div className="grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-pink-500 text-3xl font-black shadow-lg">♡</div>
             <h1 className="mt-8 text-5xl font-black tracking-tight md:text-6xl">IT’S A DATE</h1>
             <p className="mt-5 max-w-md text-lg leading-8 text-slate-300">
-              Log in to rank your Chicago dates, save ideas across devices, and keep your list private to you.
+              Log in to rank dates by city, save ideas across devices, and keep your list private to you.
             </p>
             <div className="mt-8 grid gap-3 text-sm font-bold text-slate-200">
               <div className="rounded-2xl bg-white/10 p-4">✓ Cross-device saved dates</div>
@@ -1335,7 +1449,7 @@ function AuthGate() {
   );
 }
 
-function DateFormModal({ form, setForm, editingDate, onSubmit, onClose, toggleArrayValue, updatePlace, addStop, removeStop }) {
+function DateFormModal({ form, setForm, selectedCity, editingDate, onSubmit, onClose, toggleArrayValue, updatePlace, addStop, removeStop }) {
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-sm md:p-4">
       <form onSubmit={onSubmit} className="mx-auto my-4 max-w-4xl rounded-[2rem] bg-white p-5 shadow-2xl md:my-8 md:p-6">
@@ -1343,10 +1457,12 @@ function DateFormModal({ form, setForm, editingDate, onSubmit, onClose, toggleAr
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">{editingDate ? "Edit date" : "Add a date"}</p>
             <h2 className="mt-2 text-3xl font-black">{editingDate ? "Update your date night" : "Log one of your date nights"}</h2>
-            <p className="mt-1 text-sm text-slate-500">This saves to your account and syncs across devices.</p>
+            <p className="mt-1 text-sm text-slate-500">This saves to your account under {selectedCity} and syncs across devices.</p>
           </div>
           <button type="button" onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-100 text-xl font-black hover:bg-slate-200">×</button>
         </div>
+
+        <div className="mb-4 rounded-2xl bg-orange-50 px-4 py-3 text-sm font-black text-orange-700 ring-1 ring-orange-100">City: {form.city || selectedCity}</div>
 
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="Date title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} placeholder="West Loop dinner + drinks" />
@@ -1355,7 +1471,7 @@ function DateFormModal({ form, setForm, editingDate, onSubmit, onClose, toggleAr
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <Select label="Neighborhood" value={form.neighborhood} onChange={(value) => setForm({ ...form, neighborhood: value })} options={allNeighborhoods} />
+          <Select label="Neighborhood" value={form.neighborhood} onChange={(value) => setForm({ ...form, neighborhood: value })} options={getNeighborhoodsForCity(form.city || selectedCity)} />
           <Select label="Price" value={form.price} onChange={(value) => setForm({ ...form, price: value })} options={allPrices} />
         </div>
 
@@ -1455,6 +1571,23 @@ function UserMenu({ user, profile, onProfile }) {
   );
 }
 
+
+function CitySwitcher({ selectedCity, onChange, compact = false }) {
+  return (
+    <div className={`flex rounded-2xl bg-white/10 p-1 ${compact ? "max-w-[150px]" : ""}`}>
+      {cities.map((city) => (
+        <button
+          key={city}
+          onClick={() => onChange(city)}
+          className={`rounded-xl px-3 py-2 text-xs font-black transition ${selectedCity === city ? "bg-white text-[#10182A]" : "text-slate-300 hover:bg-white/10"}`}
+        >
+          {compact ? (city === "New York" ? "NYC" : "CHI") : city}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function NavButton({ active, onClick, children }) {
   return (
     <button onClick={onClick} className={`rounded-2xl px-5 py-3 text-sm font-black ${active ? "bg-white text-[#10182A]" : "bg-white/10 text-white hover:bg-white/20"}`}>
@@ -1487,6 +1620,7 @@ function estimateCostFromPrice(price) {
 function rowToDate(row) {
   return {
     id: row.id,
+    city: row.city || "Chicago",
     user: "You",
     avatar: "Y",
     title: row.title,
