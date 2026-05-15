@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./utils/supabase.js";
 
-const SAVED_EXPLORE_KEY = "daterank_saved_explore_v1";
 const exploreDates = [
   {
     id: "explore-aba-lazybird",
@@ -13,6 +12,7 @@ const exploreDates = [
     dateTypes: ["Dinner", "Drinks"],
     vibes: ["Romantic", "Pretty", "Lively"],
     rating: 9.4,
+    estimatedTotalCost: "$120–$180",
     places: [
       { name: "Aba", type: "Dinner", ordered: ["Whipped feta", "Short rib hummus", "Crispy potatoes"] },
       { name: "Lazy Bird", type: "Drinks", ordered: ["Espresso martini"] },
@@ -29,6 +29,7 @@ const exploreDates = [
     dateTypes: ["Dinner", "Cocktails"],
     vibes: ["Cozy", "Dark", "Fun"],
     rating: 8.9,
+    estimatedTotalCost: "$70–$120",
     places: [
       { name: "Quartino", type: "Dinner", ordered: ["Truffle pizza", "Carbonara"] },
       { name: "The Violet Hour", type: "Cocktails", ordered: ["Custom cocktails"] },
@@ -45,6 +46,7 @@ const exploreDates = [
     dateTypes: ["Activity", "Coffee"],
     vibes: ["Cute", "Daytime", "Artsy"],
     rating: 8.7,
+    estimatedTotalCost: "$50–$90",
     places: [
       { name: "Art Institute of Chicago", type: "Activity", ordered: [] },
       { name: "Sawada Coffee", type: "Coffee", ordered: ["Military latte"] },
@@ -61,6 +63,7 @@ const exploreDates = [
     dateTypes: ["Dinner", "Cocktails"],
     vibes: ["Romantic", "Fancy", "Impressive"],
     rating: 9.6,
+    estimatedTotalCost: "$180+",
     places: [
       { name: "Monteverde", type: "Dinner", ordered: ["Cacio whey pepe", "Burrata e ham"] },
       { name: "RM Champagne Salon", type: "Cocktails", ordered: ["Champagne"] },
@@ -77,6 +80,7 @@ const exploreDates = [
     dateTypes: ["Drinks", "Dessert"],
     vibes: ["Dark", "Fun", "Lively"],
     rating: 8.8,
+    estimatedTotalCost: "$80–$130",
     places: [
       { name: "Dorian's", type: "Drinks", ordered: ["Espresso martini"] },
       { name: "Milk Bar", type: "Dessert", ordered: ["Cereal milk soft serve"] },
@@ -93,6 +97,7 @@ const exploreDates = [
     dateTypes: ["Dinner", "Show"],
     vibes: ["Intimate", "Artsy", "Romantic"],
     rating: 9.2,
+    estimatedTotalCost: "$140–$220",
     places: [
       { name: "Galit", type: "Dinner", ordered: ["Hummus", "Falafel", "Salatim"] },
       { name: "Kingston Mines", type: "Show", ordered: [] },
@@ -109,6 +114,7 @@ const exploreDates = [
     dateTypes: ["Dinner", "Cocktails"],
     vibes: ["Fancy", "Impressive", "Pretty"],
     rating: 9.7,
+    estimatedTotalCost: "$220+",
     places: [
       { name: "avec", type: "Dinner", ordered: ["Chorizo-stuffed dates", "Focaccia"] },
       { name: "The Aviary", type: "Cocktails", ordered: ["Signature cocktails"] },
@@ -125,6 +131,7 @@ const exploreDates = [
     dateTypes: ["Dinner", "Walk"],
     vibes: ["Romantic", "Pretty", "Intimate"],
     rating: 9.5,
+    estimatedTotalCost: "$180+",
     places: [
       { name: "North Pond", type: "Dinner", ordered: ["Tasting menu"] },
       { name: "Lakefront Trail", type: "Walk", ordered: [] },
@@ -173,56 +180,52 @@ function emptyForm() {
   };
 }
 
-function safeLoad(key, fallback) {
-  try {
-    const saved = window.localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function normalizeDbDate(row) {
+function formFromDate(date) {
   return {
-    id: row.id,
-    user: "You",
-    avatar: "Y",
-    title: row.title || "Untitled Date Night",
-    neighborhood: row.neighborhood || "Other",
-    price: row.price || "$$",
-    dateTypes: row.date_types || [],
-    vibes: row.vibes || [],
-    rating: Number(row.rating || 0),
-    estimatedTotalCost: row.estimated_total_cost || estimateCostFromPrice(row.price || "$$"),
-    places: Array.isArray(row.places) ? row.places : [],
-    notes: row.notes || "No notes yet.",
-    createdAt: row.created_at,
+    title: date.title || "",
+    neighborhood: date.neighborhood || "West Loop",
+    price: date.price || "$$",
+    dateTypes: date.dateTypes || ["Dinner"],
+    vibes: date.vibes || ["Romantic"],
+    rating: String(date.rating || "8.5"),
+    estimatedTotalCost: date.estimatedTotalCost || "",
+    places: (date.places || []).map((place) => ({
+      name: place.name || "",
+      type: place.type || "Activity",
+      orderedText: (place.ordered || []).join(", "),
+    })),
+    notes: date.notes || "",
   };
 }
 
-function buildDatePayload(date, userId) {
+function cleanDatePayload(form) {
+  const cleanPlaces = form.places
+    .filter((place) => place.name.trim())
+    .map((place) => ({
+      name: place.name.trim(),
+      type: place.type,
+      ordered: place.orderedText.split(",").map((item) => item.trim()).filter(Boolean),
+    }));
+
   return {
-    user_id: userId,
-    title: date.title,
-    neighborhood: date.neighborhood,
-    price: date.price,
-    date_types: date.dateTypes,
-    vibes: date.vibes,
-    rating: Number(date.rating || 0),
-    estimated_total_cost: date.estimatedTotalCost || estimateCostFromPrice(date.price),
-    places: date.places || [],
-    notes: date.notes || "No notes yet.",
+    title: form.title.trim() || "Untitled Date Night",
+    neighborhood: form.neighborhood,
+    estimatedTotalCost: form.estimatedTotalCost.trim() || estimateCostFromPrice(form.price),
+    price: form.price,
+    dateTypes: form.dateTypes,
+    vibes: form.vibes,
+    rating: Number(form.rating) || 8,
+    places: cleanPlaces.length ? cleanPlaces : [{ name: "TBD", type: "Activity", ordered: [] }],
+    notes: form.notes.trim() || "No notes yet.",
   };
 }
 
 export default function App() {
   const [activePage, setActivePage] = useState("myDates");
   const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
   const [myDates, setMyDates] = useState([]);
-  const [datesLoading, setDatesLoading] = useState(false);
-  const [datesError, setDatesError] = useState("");
-  const [savedExplore, setSavedExplore] = useState(() => safeLoad(SAVED_EXPLORE_KEY, {}));
+  const [loadingDates, setLoadingDates] = useState(false);
   const [selectedVibe, setSelectedVibe] = useState("All");
   const [selectedType, setSelectedType] = useState("All");
   const [selectedNeighborhood, setSelectedNeighborhood] = useState("All");
@@ -230,95 +233,164 @@ export default function App() {
   const [sortBy, setSortBy] = useState("Highest rated");
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingDate, setEditingDate] = useState(null);
   const [form, setForm] = useState(emptyForm());
   const [likedExploreDates, setLikedExploreDates] = useState({});
+  const [exploreLikeCounts, setExploreLikeCounts] = useState({});
   const [comments, setComments] = useState({});
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
-    window.localStorage.setItem(SAVED_EXPLORE_KEY, JSON.stringify(savedExplore));
-  }, [savedExplore]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setUser(data.session?.user || null);
-      setAuthLoading(false);
-    });
+    supabase.auth.getUser().then(({ data }) => setUser(data.user || null));
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
-      setAuthLoading(false);
+      if (!session?.user) {
+        setMyDates([]);
+        setProfile(null);
+      }
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      setMyDates([]);
+    if (!user) return;
+    loadMyDates();
+    loadProfile();
+    loadExploreEngagement();
+  }, [user]);
+
+  async function loadProfile() {
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+
+    if (error) {
+      console.error(error);
       return;
     }
 
-    let mounted = true;
-
-    async function loadMyDates() {
-      setDatesLoading(true);
-      setDatesError("");
-
-      const { data, error } = await supabase
-        .from("dates")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!mounted) return;
-
-      if (error) {
-        console.error(error);
-        setDatesError(error.message);
-        setMyDates([]);
-      } else {
-        setMyDates((data || []).map(normalizeDbDate));
-      }
-
-      setDatesLoading(false);
+    if (data) {
+      setProfile(data);
+      return;
     }
 
-    loadMyDates();
-
-    return () => {
-      mounted = false;
+    const emailName = user.email?.split("@")[0] || "datefan";
+    const defaultProfile = {
+      id: user.id,
+      email: user.email,
+      username: `${emailName}${String(user.id).slice(0, 4)}`.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase(),
+      display_name: emailName,
     };
-  }, [user]);
+
+    const { data: inserted, error: insertError } = await supabase.from("profiles").insert(defaultProfile).select().single();
+
+    if (insertError) {
+      console.error(insertError);
+    } else {
+      setProfile(inserted);
+    }
+  }
+
+  async function updateProfile(nextProfile) {
+    const cleanUsername = nextProfile.username.trim().replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+
+    if (!cleanUsername) {
+      alert("Please enter a username using letters, numbers, or underscores.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({
+        username: cleanUsername,
+        display_name: nextProfile.display_name.trim() || cleanUsername,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id)
+      .select()
+      .single();
+
+    if (error) {
+      alert(error.message);
+    } else {
+      setProfile(data);
+      setIsProfileOpen(false);
+    }
+  }
+
+  async function loadMyDates() {
+    setLoadingDates(true);
+
+    const { data, error } = await supabase
+      .from("dates")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      alert(error.message);
+      setLoadingDates(false);
+      return;
+    }
+
+    setMyDates((data || []).map(rowToDate));
+    setLoadingDates(false);
+  }
+
+  async function loadExploreEngagement() {
+    const ids = exploreDates.map((date) => date.id);
+
+    const [{ data: likes }, { data: allComments }] = await Promise.all([
+      supabase.from("explore_likes").select("*").in("explore_date_id", ids),
+      supabase.from("explore_comments").select("*, profiles(display_name, username)").in("explore_date_id", ids).order("created_at", { ascending: true }),
+    ]);
+
+    const userLikes = {};
+    const likeCounts = {};
+    (likes || []).forEach((like) => {
+      likeCounts[like.explore_date_id] = (likeCounts[like.explore_date_id] || 0) + 1;
+      if (like.user_id === user.id) userLikes[like.explore_date_id] = true;
+    });
+
+    const groupedComments = {};
+    (allComments || []).forEach((comment) => {
+      const name = comment.profiles?.display_name || comment.profiles?.username || "User";
+      groupedComments[comment.explore_date_id] = [
+        ...(groupedComments[comment.explore_date_id] || []),
+        { id: comment.id, user: name, text: comment.text },
+      ];
+    });
+
+    setLikedExploreDates(userLikes);
+    setExploreLikeCounts(likeCounts);
+    setComments(groupedComments);
+  }
 
   const currentDates = activePage === "myDates" ? myDates : exploreDates;
 
   const enrichedDates = useMemo(() => {
     return currentDates.map((date, index) => {
-      const baseLikes = getBaseLikes(date.id, index + 1);
-      const baseComments = getBaseComments(date.id, index + 1);
+      const baseLikes = activePage === "explore" ? getBaseLikes(date.id, index + 1) : 0;
+      const baseComments = activePage === "explore" ? getBaseComments(date.id, index + 1) : 0;
       return {
         ...date,
-        likeCount: baseLikes + (likedExploreDates[date.id] ? 1 : 0),
+        likeCount: baseLikes + (exploreLikeCounts[date.id] || 0),
         commentCount: baseComments + (comments[date.id]?.length || 0),
-        saved: !!savedExplore[date.id],
+        saved: false,
       };
     });
-  }, [currentDates, likedExploreDates, comments, savedExplore]);
+  }, [currentDates, activePage, exploreLikeCounts, comments]);
 
   const filterOptions = useMemo(() => {
     const source = currentDates.length ? currentDates : exploreDates;
     return {
-      vibes: ["All", ...new Set(source.flatMap((p) => p.vibes))],
-      types: ["All", ...new Set(source.flatMap((p) => p.dateTypes))],
-      neighborhoods: ["All", ...new Set(source.map((p) => p.neighborhood))],
-      prices: ["All", ...new Set(source.map((p) => p.price))],
+      vibes: ["All", ...new Set(source.flatMap((p) => p.vibes || []))],
+      types: ["All", ...new Set(source.flatMap((p) => p.dateTypes || []))],
+      neighborhoods: ["All", ...new Set(source.map((p) => p.neighborhood).filter(Boolean))],
+      prices: ["All", ...new Set(source.map((p) => p.price).filter(Boolean))],
     };
   }, [currentDates]);
 
@@ -351,7 +423,7 @@ export default function App() {
         if (sortBy === "Most commented") return Number(b.commentCount || 0) - Number(a.commentCount || 0);
         if (sortBy === "Cheapest") return a.price.length - b.price.length;
         if (sortBy === "Most expensive") return b.price.length - a.price.length;
-        if (sortBy === "Newest") return String(b.id).localeCompare(String(a.id));
+        if (sortBy === "Newest") return String(b.created_at || b.id).localeCompare(String(a.created_at || a.id));
         return 0;
       });
   }, [enrichedDates, search, selectedVibe, selectedType, selectedNeighborhood, selectedPrice, sortBy]);
@@ -364,6 +436,18 @@ export default function App() {
     setSelectedNeighborhood("All");
     setSelectedPrice("All");
     setSearch("");
+  }
+
+  function openAddModal() {
+    setEditingDate(null);
+    setForm(emptyForm());
+    setIsModalOpen(true);
+  }
+
+  function openEditModal(date) {
+    setEditingDate(date);
+    setForm(formFromDate(date));
+    setIsModalOpen(true);
   }
 
   function toggleArrayValue(field, value) {
@@ -398,193 +482,211 @@ export default function App() {
   async function submitDate(e) {
     e.preventDefault();
 
-    if (!user) {
-      alert("Please log in first.");
-      return;
+    const payload = cleanDatePayload(form);
+
+    if (editingDate) {
+      const { data, error } = await supabase
+        .from("dates")
+        .update({
+          title: payload.title,
+          neighborhood: payload.neighborhood,
+          price: payload.price,
+          date_types: payload.dateTypes,
+          vibes: payload.vibes,
+          rating: payload.rating,
+          estimated_total_cost: payload.estimatedTotalCost,
+          places: payload.places,
+          notes: payload.notes,
+        })
+        .eq("id", editingDate.id)
+        .eq("user_id", user.id)
+        .select()
+        .single();
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      setMyDates((prev) => prev.map((date) => (date.id === editingDate.id ? rowToDate(data) : date)));
+    } else {
+      const { data, error } = await supabase
+        .from("dates")
+        .insert({
+          user_id: user.id,
+          title: payload.title,
+          neighborhood: payload.neighborhood,
+          price: payload.price,
+          date_types: payload.dateTypes,
+          vibes: payload.vibes,
+          rating: payload.rating,
+          estimated_total_cost: payload.estimatedTotalCost,
+          places: payload.places,
+          notes: payload.notes,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      setMyDates((prev) => [rowToDate(data), ...prev]);
     }
 
-    const cleanPlaces = form.places
-      .filter((place) => place.name.trim())
-      .map((place) => ({
-        name: place.name.trim(),
-        type: place.type,
-        ordered: place.orderedText.split(",").map((item) => item.trim()).filter(Boolean),
-      }));
-
-    const newDate = {
-      user: "You",
-      avatar: "Y",
-      title: form.title.trim() || "Untitled Date Night",
-      neighborhood: form.neighborhood,
-      estimatedTotalCost: form.estimatedTotalCost.trim() || estimateCostFromPrice(form.price),
-      price: form.price,
-      dateTypes: form.dateTypes,
-      vibes: form.vibes,
-      rating: Number(form.rating) || 8,
-      places: cleanPlaces.length ? cleanPlaces : [{ name: "TBD", type: "Activity", ordered: [] }],
-      notes: form.notes.trim() || "No notes yet.",
-    };
-
-    const { data, error } = await supabase
-      .from("dates")
-      .insert(buildDatePayload(newDate, user.id))
-      .select()
-      .single();
-
-    if (error) {
-      console.error(error);
-      alert(`Could not save date: ${error.message}`);
-      return;
-    }
-
-    setMyDates((prev) => [normalizeDbDate(data), ...prev]);
     setForm(emptyForm());
+    setEditingDate(null);
     setIsModalOpen(false);
     setActivePage("myDates");
     resetFilters();
   }
 
   async function deleteDate(id) {
-    const previousDates = myDates;
-    setMyDates((prev) => prev.filter((date) => date.id !== id));
-
-    const { error } = await supabase.from("dates").delete().eq("id", id);
-
+    const { error } = await supabase.from("dates").delete().eq("id", id).eq("user_id", user.id);
     if (error) {
-      console.error(error);
-      setMyDates(previousDates);
-      alert(`Could not delete date: ${error.message}`);
+      alert(error.message);
+      return;
     }
+    setMyDates((prev) => prev.filter((date) => date.id !== id));
   }
 
   async function clearMyDates() {
-    if (!window.confirm("Delete all of your saved dates?")) return;
-
-    const previousDates = myDates;
-    setMyDates([]);
-
+    if (!window.confirm("Delete all your saved dates?")) return;
     const { error } = await supabase.from("dates").delete().eq("user_id", user.id);
-
     if (error) {
-      console.error(error);
-      setMyDates(previousDates);
-      alert(`Could not clear dates: ${error.message}`);
+      alert(error.message);
+      return;
+    }
+    setMyDates([]);
+  }
+
+  async function toggleExploreLike(id) {
+    if (likedExploreDates[id]) {
+      const { error } = await supabase.from("explore_likes").delete().eq("user_id", user.id).eq("explore_date_id", id);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      setLikedExploreDates((prev) => ({ ...prev, [id]: false }));
+      setExploreLikeCounts((prev) => ({ ...prev, [id]: Math.max((prev[id] || 1) - 1, 0) }));
+    } else {
+      const { error } = await supabase.from("explore_likes").insert({ user_id: user.id, explore_date_id: id });
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      setLikedExploreDates((prev) => ({ ...prev, [id]: true }));
+      setExploreLikeCounts((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
     }
   }
 
-  function toggleExploreLike(id) {
-    setLikedExploreDates((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  function toggleSaveExplore(id) {
-    setSavedExplore((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  function addComment(id, text) {
+  async function addComment(id, text) {
     const clean = text.trim();
     if (!clean) return;
+
+    const { data, error } = await supabase
+      .from("explore_comments")
+      .insert({ user_id: user.id, explore_date_id: id, text: clean })
+      .select()
+      .single();
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
     setComments((prev) => ({
       ...prev,
-      [id]: [...(prev[id] || []), { user: "You", text: clean, id: Date.now() }],
+      [id]: [...(prev[id] || []), { user: profile?.display_name || profile?.username || "You", text: clean, id: data.id }],
     }));
   }
 
   async function addExploreToMyDates(date) {
-    if (!user) {
-      alert("Please log in first.");
-      return;
-    }
-
-    const copiedDate = {
-      user: "You",
-      avatar: "Y",
-      title: date.title,
-      neighborhood: date.neighborhood,
-      estimatedTotalCost: date.estimatedTotalCost || estimateCostFromPrice(date.price),
-      price: date.price,
-      dateTypes: date.dateTypes,
-      vibes: date.vibes,
-      rating: Number(date.rating) || 8,
-      places: date.places || [],
+    const copied = {
+      ...date,
       notes: `${date.notes} Saved from Explore.`,
     };
 
     const { data, error } = await supabase
       .from("dates")
-      .insert(buildDatePayload(copiedDate, user.id))
+      .insert({
+        user_id: user.id,
+        title: copied.title,
+        neighborhood: copied.neighborhood,
+        price: copied.price,
+        date_types: copied.dateTypes,
+        vibes: copied.vibes,
+        rating: copied.rating,
+        estimated_total_cost: copied.estimatedTotalCost || estimateCostFromPrice(copied.price),
+        places: copied.places,
+        notes: copied.notes,
+      })
       .select()
       .single();
 
     if (error) {
-      console.error(error);
-      alert(`Could not save date: ${error.message}`);
+      alert(error.message);
       return;
     }
 
-    setMyDates((prev) => [normalizeDbDate(data), ...prev]);
+    setMyDates((prev) => [rowToDate(data), ...prev]);
     setActivePage("myDates");
     resetFilters();
   }
 
-  if (authLoading) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-[#eef7ff] px-4 text-[#172033]">
-        <div className="rounded-[2rem] bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
-          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 text-2xl font-black text-white">♡</div>
-          <p className="text-sm font-black uppercase tracking-[0.2em] text-orange-500">IT’S A DATE</p>
-          <h1 className="mt-2 text-2xl font-black">Loading your account...</h1>
-        </div>
-      </div>
-    );
-  }
-
   if (!user) {
-    return <AuthGate setUser={setUser} />;
+    return <AuthGate />;
   }
 
   return (
     <div className="min-h-screen bg-[#eef7ff] pb-24 text-[#172033] md:pb-0">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-[#10182A]/95 px-4 py-4 text-white shadow-xl backdrop-blur md:px-6">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 text-xl font-black shadow-lg">♡</div>
-            <div>
-              <h1 className="text-xl font-black tracking-tight md:text-2xl">IT’S A DATE</h1>
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 text-xl font-black shadow-lg md:h-12 md:w-12">♡</div>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-black tracking-tight md:text-2xl">IT’S A DATE</h1>
               <p className="hidden text-sm text-slate-400 sm:block">Rank full date nights, not just places.</p>
             </div>
           </div>
 
-          <div className="hidden flex-wrap gap-2 md:flex">
+          <div className="hidden flex-wrap items-center gap-2 md:flex">
             <NavButton active={activePage === "myDates"} onClick={() => { setActivePage("myDates"); resetFilters(); }}>Your Dates</NavButton>
             <NavButton active={activePage === "explore"} onClick={() => { setActivePage("explore"); resetFilters(); }}>Explore</NavButton>
-            <button onClick={() => setIsModalOpen(true)} className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg hover:bg-orange-600">
+            <button onClick={openAddModal} className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg hover:bg-orange-600">
               + Add Date
             </button>
-            <AuthBox user={user} setUser={setUser} />
+            <UserMenu user={user} profile={profile} onProfile={() => setIsProfileOpen(true)} />
           </div>
 
-          <button onClick={() => setIsModalOpen(true)} className="rounded-2xl bg-orange-500 px-4 py-3 text-sm font-black text-white shadow-lg md:hidden">
-            +
-          </button>
+          <div className="flex gap-2 md:hidden">
+            <button onClick={() => setIsProfileOpen(true)} className="rounded-2xl bg-white/10 px-3 py-3 text-xs font-black text-white">
+              {profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"}
+            </button>
+            <button onClick={openAddModal} className="rounded-2xl bg-orange-500 px-4 py-3 text-sm font-black text-white shadow-lg">
+              +
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl p-4 md:p-6">
+      <main className="mx-auto max-w-7xl p-3 md:p-6">
         <section className="mb-5 overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-200">
-          <div className="bg-gradient-to-br from-[#172033] to-[#26395f] p-6 text-white">
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-300">{activePage === "myDates" ? "Your Dates" : "Explore"}</p>
+          <div className="bg-gradient-to-br from-[#172033] to-[#26395f] p-5 text-white md:p-6">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-300 md:text-sm">{activePage === "myDates" ? "Your Dates" : "Explore"}</p>
             <h2 className="mt-2 text-3xl font-black md:text-5xl">
               {activePage === "myDates" ? "Your ranked date nights" : "Find your next date idea"}
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
               {activePage === "myDates"
-                ? "Track your own dates, rank them, and remember what was actually worth repeating."
-                : "Browse Chicago date ideas, like your favorites, save them, comment, or copy them into your own list."}
+                ? "Track your own dates, edit them anytime, and see them on every device."
+                : "Browse Chicago date ideas, like your favorites, comment, or copy them into your own list."}
             </p>
           </div>
 
-          <div className="p-5">
-            <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr]">
+          <div className="p-4 md:p-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr]">
               <Field label="Search" value={search} onChange={setSearch} placeholder="Search pasta, romantic, West Loop..." />
               <Select label="Sort by" value={sortBy} onChange={setSortBy} options={["Highest rated", "Most liked", "Most commented", "Cheapest", "Most expensive", "Newest"]} />
               <Select label="Type" value={selectedType} onChange={setSelectedType} options={filterOptions.types} />
@@ -595,7 +697,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-5 grid gap-3 md:grid-cols-4">
+        <section className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
           <KpiCard label={activePage === "myDates" ? "Dates logged" : "Explore posts"} value={kpis.count} helper={activePage === "myDates" ? "Your saved date nights" : "Public inspo posts"} />
           <KpiCard label="Neighborhoods" value={kpis.neighborhoods} helper="Unique areas represented" />
           <KpiCard label="Average rating" value={kpis.averageRating} helper="Across this page" />
@@ -610,18 +712,12 @@ export default function App() {
           </div>
         )}
 
-        {activePage === "myDates" && datesLoading ? (
+        {loadingDates ? (
           <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
-            <h3 className="text-2xl font-black">Loading your saved dates...</h3>
-            <p className="mt-2 text-slate-500">Pulling your dates from Supabase.</p>
-          </div>
-        ) : activePage === "myDates" && datesError ? (
-          <div className="rounded-[2rem] bg-red-50 p-10 text-center text-red-700 shadow-sm ring-1 ring-red-200">
-            <h3 className="text-2xl font-black">Could not load your dates</h3>
-            <p className="mt-2 text-sm font-semibold">{datesError}</p>
+            <h3 className="text-2xl font-black">Loading your dates...</h3>
           </div>
         ) : activePage === "myDates" && myDates.length === 0 ? (
-          <EmptyMyDates onAdd={() => setIsModalOpen(true)} onExplore={() => setActivePage("explore")} />
+          <EmptyMyDates onAdd={openAddModal} onExplore={() => setActivePage("explore")} />
         ) : filtered.length === 0 ? (
           <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
             <h3 className="text-2xl font-black">No matching dates yet</h3>
@@ -636,9 +732,9 @@ export default function App() {
                 rank={index + 1}
                 mode={activePage}
                 onDelete={deleteDate}
+                onEdit={openEditModal}
                 isLiked={!!likedExploreDates[date.id]}
                 onLike={toggleExploreLike}
-                onSave={toggleSaveExplore}
                 onAddToMine={addExploreToMyDates}
                 comments={comments[date.id] || []}
                 onComment={addComment}
@@ -648,289 +744,262 @@ export default function App() {
         )}
       </main>
 
-      <MobileNav activePage={activePage} setActivePage={setActivePage} resetFilters={resetFilters} openModal={() => setIsModalOpen(true)} />
+      <MobileNav activePage={activePage} setActivePage={setActivePage} resetFilters={resetFilters} openModal={openAddModal} />
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm">
-          <form onSubmit={submitDate} className="mx-auto my-8 max-w-4xl rounded-[2rem] bg-white p-6 shadow-2xl">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">Add a date</p>
-                <h2 className="mt-2 text-3xl font-black">Log one of your date nights</h2>
-                <p className="mt-1 text-sm text-slate-500">This saves locally in your browser for now.</p>
-              </div>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-xl font-black hover:bg-slate-200">×</button>
-            </div>
+        <DateFormModal
+          form={form}
+          setForm={setForm}
+          editingDate={editingDate}
+          onSubmit={submitDate}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingDate(null);
+            setForm(emptyForm());
+          }}
+          toggleArrayValue={toggleArrayValue}
+          updatePlace={updatePlace}
+          addStop={addStop}
+          removeStop={removeStop}
+        />
+      )}
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <Field label="Date title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} placeholder="West Loop dinner + drinks" />
-              <Field label="Rating" value={form.rating} onChange={(value) => setForm({ ...form, rating: value })} placeholder="9.2" />
-              <Field label="Estimated Total Cost" value={form.estimatedTotalCost} onChange={(value) => setForm({ ...form, estimatedTotalCost: value })} placeholder="$80–$120" />
-            </div>
-
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <Select label="Neighborhood" value={form.neighborhood} onChange={(value) => setForm({ ...form, neighborhood: value })} options={allNeighborhoods} />
-              <Select label="Price" value={form.price} onChange={(value) => setForm({ ...form, price: value })} options={allPrices} />
-            </div>
-
-            <ChipSection title="What did the date include?" options={allTypes} selected={form.dateTypes} onToggle={(value) => toggleArrayValue("dateTypes", value)} />
-            <ChipSection title="What was the vibe?" options={allVibes} selected={form.vibes} onToggle={(value) => toggleArrayValue("vibes", value)} />
-
-            <div className="mt-6 rounded-[2rem] bg-slate-50 p-4 ring-1 ring-slate-200">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-black">Stops / places</h3>
-                <button type="button" onClick={addStop} className="rounded-2xl bg-[#172033] px-4 py-2 text-sm font-black text-white">+ Add stop</button>
-              </div>
-
-              <div className="space-y-4">
-                {form.places.map((place, index) => (
-                  <div key={index} className="rounded-3xl bg-white p-4 ring-1 ring-slate-200">
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="font-black text-orange-500">Stop {index + 1}</span>
-                      <button type="button" onClick={() => removeStop(index)} className="text-sm font-bold text-slate-400 hover:text-red-500">Remove</button>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-[1fr_160px]">
-                      <Field label="Place name" value={place.name} onChange={(value) => updatePlace(index, "name", value)} placeholder="Aba" />
-                      <Select label="Type" value={place.type} onChange={(value) => updatePlace(index, "type", value)} options={allTypes} />
-                    </div>
-                    <Field label="What did you order / do?" value={place.orderedText} onChange={(value) => updatePlace(index, "orderedText", value)} placeholder="Whipped feta, espresso martini, walk by the river" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-black text-slate-700">Notes</span>
-              <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="What made this date good? Who is it best for? Any watch-outs?" className="min-h-28 w-full rounded-2xl bg-slate-50 px-4 py-3 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400" />
-            </label>
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-2xl bg-slate-100 px-6 py-3 font-black text-slate-600 hover:bg-slate-200">Cancel</button>
-              <button type="submit" className="rounded-2xl bg-orange-500 px-6 py-3 font-black text-white shadow-lg shadow-orange-200 hover:bg-orange-600">Add to Your Dates</button>
-            </div>
-          </form>
-        </div>
+      {isProfileOpen && (
+        <ProfileModal
+          user={user}
+          profile={profile}
+          onClose={() => setIsProfileOpen(false)}
+          onSave={updateProfile}
+        />
       )}
     </div>
   );
 }
 
-function AuthGate({ setUser }) {
+function AuthGate() {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  async function handleAuth(e) {
+  async function logIn(e) {
     e.preventDefault();
-    setMessage("");
+    setBusy(true);
 
-    if (!email || !password) {
-      setMessage("Please enter an email and password.");
-      return;
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (password.length < 6) {
-      setMessage("Password must be at least 6 characters.");
-      return;
-    }
+    setBusy(false);
+    if (error) alert(error.message);
+  }
 
-    setIsSubmitting(true);
+  async function signUp(e) {
+    e.preventDefault();
+    setBusy(true);
 
-    if (mode === "signup") {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      setIsSubmitting(false);
-
-      if (error) {
-        setMessage(error.message);
-        return;
-      }
-
-      if (data.session?.user) {
-        setUser(data.session.user);
-      } else {
-        setMessage("Account created. Check your email to confirm your signup, then come back and log in.");
-      }
-      return;
-    }
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setIsSubmitting(false);
+    const { data, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
-      setMessage(error.message);
+      setBusy(false);
+      alert(error.message);
       return;
     }
 
-    setUser(data.user);
+    if (data.user) {
+      await supabase.from("profiles").insert({
+        id: data.user.id,
+        email,
+        username: email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").toLowerCase(),
+        display_name: displayName.trim() || email.split("@")[0],
+      });
+    }
+
+    setBusy(false);
+    alert("Account created. If Supabase asks for email confirmation, check your inbox.");
+  }
+
+  async function resetPassword() {
+    if (!email) {
+      alert("Enter your email first, then hit Reset password.");
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+
+    if (error) alert(error.message);
+    else alert("Password reset email sent.");
   }
 
   return (
-    <div className="min-h-screen bg-[#eef7ff] px-4 py-8 text-[#172033]">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-[2.5rem] bg-white shadow-2xl ring-1 ring-slate-200 lg:grid-cols-[1.05fr_0.95fr]">
-          <section className="relative hidden bg-gradient-to-br from-[#10182A] via-[#172033] to-[#26395f] p-10 text-white lg:block">
-            <div className="absolute right-8 top-8 rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-orange-200">Chicago dating, ranked</div>
-            <div className="flex h-full flex-col justify-between">
-              <div>
-                <div className="grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-pink-500 text-3xl font-black shadow-lg">♡</div>
-                <h1 className="mt-8 text-5xl font-black tracking-tight">IT’S A DATE</h1>
-                <p className="mt-4 max-w-md text-lg leading-8 text-slate-300">Sign in to rank your date nights, save Chicago ideas, and keep your favorites tied to your account.</p>
-              </div>
-
-              <div className="grid gap-3">
-                <div className="rounded-3xl bg-white/10 p-5 backdrop-blur">
-                  <p className="text-sm font-black text-orange-200">Your private list</p>
-                  <p className="mt-1 text-sm text-slate-300">Only logged-in users can access the app.</p>
-                </div>
-                <div className="rounded-3xl bg-white/10 p-5 backdrop-blur">
-                  <p className="text-sm font-black text-orange-200">Explore date ideas</p>
-                  <p className="mt-1 text-sm text-slate-300">Browse, like, comment, and copy ideas into your own rankings.</p>
-                </div>
-              </div>
+    <div className="min-h-screen bg-[#eef7ff] p-4 text-[#172033]">
+      <div className="mx-auto grid min-h-screen max-w-5xl place-items-center">
+        <div className="grid w-full overflow-hidden rounded-[2.5rem] bg-white shadow-2xl ring-1 ring-slate-200 md:grid-cols-[1.1fr_0.9fr]">
+          <div className="bg-gradient-to-br from-[#10182A] via-[#172033] to-[#26395f] p-8 text-white md:p-12">
+            <div className="grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-pink-500 text-3xl font-black shadow-lg">♡</div>
+            <h1 className="mt-8 text-5xl font-black tracking-tight md:text-6xl">IT’S A DATE</h1>
+            <p className="mt-5 max-w-md text-lg leading-8 text-slate-300">
+              Log in to rank your Chicago dates, save ideas across devices, and keep your list private to you.
+            </p>
+            <div className="mt-8 grid gap-3 text-sm font-bold text-slate-200">
+              <div className="rounded-2xl bg-white/10 p-4">✓ Cross-device saved dates</div>
+              <div className="rounded-2xl bg-white/10 p-4">✓ Explore likes and comments</div>
+              <div className="rounded-2xl bg-white/10 p-4">✓ Private personal date list</div>
             </div>
-          </section>
+          </div>
 
-          <section className="p-6 sm:p-8 md:p-10">
-            <div className="mx-auto max-w-md">
-              <div className="mb-8 text-center lg:hidden">
-                <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-pink-500 text-3xl font-black text-white shadow-lg">♡</div>
-                <h1 className="mt-4 text-4xl font-black tracking-tight">IT’S A DATE</h1>
-                <p className="mt-2 text-sm font-semibold text-slate-500">Log in before using the app.</p>
-              </div>
+          <form onSubmit={mode === "login" ? logIn : signUp} className="p-6 md:p-10">
+            <p className="text-sm font-black uppercase tracking-[0.2em] text-orange-500">{mode === "login" ? "Welcome back" : "Create account"}</p>
+            <h2 className="mt-3 text-3xl font-black">{mode === "login" ? "Log in to continue" : "Sign up to start"}</h2>
 
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-orange-500">Welcome</p>
-              <h2 className="mt-2 text-3xl font-black">{mode === "login" ? "Log in to continue" : "Create your account"}</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">You’ll need an account before you can view or add dates.</p>
+            {mode === "signup" && (
+              <Field label="Display name" value={displayName} onChange={setDisplayName} placeholder="Jay" />
+            )}
 
-              <div className="mt-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
-                <button type="button" onClick={() => { setMode("login"); setMessage(""); }} className={`rounded-xl px-4 py-3 text-sm font-black ${mode === "login" ? "bg-white text-[#172033] shadow-sm" : "text-slate-500"}`}>Log in</button>
-                <button type="button" onClick={() => { setMode("signup"); setMessage(""); }} className={`rounded-xl px-4 py-3 text-sm font-black ${mode === "signup" ? "bg-white text-[#172033] shadow-sm" : "text-slate-500"}`}>Sign up</button>
-              </div>
-
-              <form onSubmit={handleAuth} className="mt-6 space-y-4">
-                <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" />
-                <label className="block">
-                  <span className="mb-2 block text-sm font-black text-slate-700">Password</span>
-                  <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" type="password" className="w-full rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400" />
-                </label>
-
-                {message && (
-                  <div className="rounded-2xl bg-orange-50 px-4 py-3 text-sm font-bold leading-6 text-orange-700 ring-1 ring-orange-100">{message}</div>
-                )}
-
-                <button disabled={isSubmitting} type="submit" className="w-full rounded-2xl bg-orange-500 px-6 py-4 font-black text-white shadow-lg shadow-orange-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60">
-                  {isSubmitting ? "Working..." : mode === "login" ? "Log in" : "Sign up"}
-                </button>
-              </form>
+            <div className="mt-4 space-y-4">
+              <Field label="Email" value={email} onChange={setEmail} placeholder="you@email.com" />
+              <label className="block">
+                <span className="mb-2 block text-sm font-black text-slate-700">Password</span>
+                <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" className="w-full rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400" />
+              </label>
             </div>
-          </section>
+
+            <button disabled={busy} type="submit" className="mt-6 w-full rounded-2xl bg-orange-500 px-6 py-4 font-black text-white shadow-lg shadow-orange-200 hover:bg-orange-600 disabled:opacity-60">
+              {busy ? "Working..." : mode === "login" ? "Log in" : "Sign up"}
+            </button>
+
+            <button type="button" onClick={resetPassword} className="mt-4 w-full rounded-2xl bg-slate-100 px-6 py-3 text-sm font-black text-slate-600 hover:bg-slate-200">
+              Reset password
+            </button>
+
+            <button type="button" onClick={() => setMode(mode === "login" ? "signup" : "login")} className="mt-4 w-full text-sm font-black text-orange-600">
+              {mode === "login" ? "Need an account? Sign up" : "Already have an account? Log in"}
+            </button>
+          </form>
         </div>
       </div>
     </div>
   );
 }
 
-function AuthBox({ user, setUser }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+function DateFormModal({ form, setForm, editingDate, onSubmit, onClose, toggleArrayValue, updatePlace, addStop, removeStop }) {
+  return (
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-sm md:p-4">
+      <form onSubmit={onSubmit} className="mx-auto my-4 max-w-4xl rounded-[2rem] bg-white p-5 shadow-2xl md:my-8 md:p-6">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">{editingDate ? "Edit date" : "Add a date"}</p>
+            <h2 className="mt-2 text-3xl font-black">{editingDate ? "Update your date night" : "Log one of your date nights"}</h2>
+            <p className="mt-1 text-sm text-slate-500">This saves to your account and syncs across devices.</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-100 text-xl font-black hover:bg-slate-200">×</button>
+        </div>
 
-  async function signUp() {
-    if (!email || !password) {
-      alert("Please enter an email and password.");
-      return;
-    }
+        <div className="grid gap-4 md:grid-cols-3">
+          <Field label="Date title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} placeholder="West Loop dinner + drinks" />
+          <Field label="Rating" value={form.rating} onChange={(value) => setForm({ ...form, rating: value })} placeholder="9.2" />
+          <Field label="Estimated Total Cost" value={form.estimatedTotalCost} onChange={(value) => setForm({ ...form, estimatedTotalCost: value })} placeholder="$80–$120" />
+        </div>
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Select label="Neighborhood" value={form.neighborhood} onChange={(value) => setForm({ ...form, neighborhood: value })} options={allNeighborhoods} />
+          <Select label="Price" value={form.price} onChange={(value) => setForm({ ...form, price: value })} options={allPrices} />
+        </div>
 
-    if (error) {
-      alert(error.message);
-    } else {
-      alert("Check your email to confirm signup!");
-    }
-  }
+        <ChipSection title="What did the date include?" options={allTypes} selected={form.dateTypes} onToggle={(value) => toggleArrayValue("dateTypes", value)} />
+        <ChipSection title="What was the vibe?" options={allVibes} selected={form.vibes} onToggle={(value) => toggleArrayValue("vibes", value)} />
 
-  async function logIn() {
-    if (!email || !password) {
-      alert("Please enter an email and password.");
-      return;
-    }
+        <div className="mt-6 rounded-[2rem] bg-slate-50 p-4 ring-1 ring-slate-200">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-black">Stops / places</h3>
+            <button type="button" onClick={addStop} className="rounded-2xl bg-[#172033] px-4 py-2 text-sm font-black text-white">+ Add stop</button>
+          </div>
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+          <div className="space-y-4">
+            {form.places.map((place, index) => (
+              <div key={index} className="rounded-3xl bg-white p-4 ring-1 ring-slate-200">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="font-black text-orange-500">Stop {index + 1}</span>
+                  <button type="button" onClick={() => removeStop(index)} className="text-sm font-bold text-slate-400 hover:text-red-500">Remove</button>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_160px]">
+                  <Field label="Place name" value={place.name} onChange={(value) => updatePlace(index, "name", value)} placeholder="Aba" />
+                  <Select label="Type" value={place.type} onChange={(value) => updatePlace(index, "type", value)} options={allTypes} />
+                </div>
+                <Field label="What did you order / do?" value={place.orderedText} onChange={(value) => updatePlace(index, "orderedText", value)} placeholder="Whipped feta, espresso martini, walk by the river" />
+              </div>
+            ))}
+          </div>
+        </div>
 
-    if (error) {
-      alert(error.message);
-    } else {
-      setUser(data.user);
-      setEmail("");
-      setPassword("");
-    }
-  }
+        <label className="mt-5 block">
+          <span className="mb-2 block text-sm font-black text-slate-700">Notes</span>
+          <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="What made this date good? Who is it best for? Any watch-outs?" className="min-h-28 w-full rounded-2xl bg-slate-50 px-4 py-3 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400" />
+        </label>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClose} className="rounded-2xl bg-slate-100 px-6 py-3 font-black text-slate-600 hover:bg-slate-200">Cancel</button>
+          <button type="submit" className="rounded-2xl bg-orange-500 px-6 py-3 font-black text-white shadow-lg shadow-orange-200 hover:bg-orange-600">
+            {editingDate ? "Save Changes" : "Add to Your Dates"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ProfileModal({ user, profile, onClose, onSave }) {
+  const [draft, setDraft] = useState({
+    display_name: profile?.display_name || "",
+    username: profile?.username || "",
+  });
 
   async function logOut() {
     await supabase.auth.signOut();
-    setUser(null);
-  }
-
-  if (user) {
-    return (
-      <div className="flex items-center gap-3">
-        <div className="max-w-[220px] truncate rounded-xl bg-white/10 px-3 py-2 text-sm font-bold text-white">
-          {user.email}
-        </div>
-        <button
-          onClick={logOut}
-          className="rounded-xl bg-white px-3 py-2 text-xs font-black text-[#10182A]"
-        >
-          Log out
-        </button>
-      </div>
-    );
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <input
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="Email"
-        className="w-36 rounded-xl px-3 py-2 text-sm text-slate-900 outline-none"
-      />
-      <input
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Password"
-        type="password"
-        className="w-32 rounded-xl px-3 py-2 text-sm text-slate-900 outline-none"
-      />
-      <button
-        onClick={logIn}
-        className="rounded-xl bg-orange-500 px-3 py-2 text-xs font-black text-white"
-      >
-        Log in
-      </button>
-      <button
-        onClick={signUp}
-        className="rounded-xl bg-white px-3 py-2 text-xs font-black text-[#10182A]"
-      >
-        Sign up
-      </button>
+    <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-[2rem] bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">Profile</p>
+            <h2 className="mt-2 text-3xl font-black">Your account</h2>
+            <p className="mt-1 text-sm font-bold text-slate-500">{user.email}</p>
+          </div>
+          <button onClick={onClose} className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-xl font-black hover:bg-slate-200">×</button>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          <Field label="Display name" value={draft.display_name} onChange={(value) => setDraft({ ...draft, display_name: value })} placeholder="Jay" />
+          <Field label="Username" value={draft.username} onChange={(value) => setDraft({ ...draft, username: value })} placeholder="jaydugar" />
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <button onClick={() => onSave(draft)} className="rounded-2xl bg-orange-500 px-6 py-3 font-black text-white hover:bg-orange-600">
+            Save profile
+          </button>
+          <button onClick={logOut} className="rounded-2xl bg-slate-100 px-6 py-3 font-black text-slate-600 hover:bg-slate-200">
+            Log out
+          </button>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function UserMenu({ user, profile, onProfile }) {
+  return (
+    <button onClick={onProfile} className="flex max-w-[260px] items-center gap-3 rounded-2xl bg-white/10 px-3 py-2 text-left hover:bg-white/20">
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white font-black text-[#10182A]">
+        {profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-black">{profile?.display_name || "Your profile"}</p>
+        <p className="truncate text-xs text-slate-400">@{profile?.username || user.email}</p>
+      </div>
+    </button>
   );
 }
 
@@ -962,18 +1031,36 @@ function estimateCostFromPrice(price) {
   return "Not estimated";
 }
 
+function rowToDate(row) {
+  return {
+    id: row.id,
+    user: "You",
+    avatar: "Y",
+    title: row.title,
+    neighborhood: row.neighborhood,
+    price: row.price,
+    dateTypes: row.date_types || [],
+    vibes: row.vibes || [],
+    rating: row.rating,
+    estimatedTotalCost: row.estimated_total_cost,
+    places: row.places || [],
+    notes: row.notes,
+    created_at: row.created_at,
+  };
+}
+
 function buildKpis(dates) {
   if (!dates.length) return { count: 0, neighborhoods: 0, averageRating: "—", topVibe: "—" };
   const neighborhoods = new Set(dates.map((date) => date.neighborhood)).size;
   const average = dates.reduce((sum, date) => sum + Number(date.rating || 0), 0) / dates.length;
-  const vibeCounts = dates.flatMap((date) => date.vibes).reduce((acc, vibe) => ({ ...acc, [vibe]: (acc[vibe] || 0) + 1 }), {});
+  const vibeCounts = dates.flatMap((date) => date.vibes || []).reduce((acc, vibe) => ({ ...acc, [vibe]: (acc[vibe] || 0) + 1 }), {});
   const topVibe = Object.entries(vibeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
   return { count: dates.length, neighborhoods, averageRating: average.toFixed(1), topVibe };
 }
 
 function KpiCard({ label, value, helper }) {
   return (
-    <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5">
       <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
       <div className="mt-3 text-3xl font-black text-[#172033]">{value}</div>
       <p className="mt-1 text-sm font-semibold text-slate-500">{helper}</p>
@@ -983,7 +1070,7 @@ function KpiCard({ label, value, helper }) {
 
 function EmptyMyDates({ onAdd, onExplore }) {
   return (
-    <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-[2rem] bg-white p-8 text-center shadow-sm ring-1 ring-slate-200 md:p-10">
       <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-orange-100 text-3xl">💘</div>
       <h3 className="mt-5 text-3xl font-black">No dates logged yet</h3>
       <p className="mx-auto mt-2 max-w-xl text-slate-500">Your personal dashboard starts empty. Add your own date nights here, then use Explore for inspiration.</p>
@@ -1041,7 +1128,7 @@ function getBaseComments(id, rank) {
   return 2 + ((id.length + rank * 3) % 11);
 }
 
-function DateCard({ date, rank, mode, onDelete, isLiked, onLike, onSave, onAddToMine, comments, onComment }) {
+function DateCard({ date, rank, mode, onDelete, onEdit, isLiked, onLike, onAddToMine, comments, onComment }) {
   const [commentText, setCommentText] = useState("");
   const isExplore = mode === "explore";
 
@@ -1069,13 +1156,10 @@ function DateCard({ date, rank, mode, onDelete, isLiked, onLike, onSave, onAddTo
           </div>
 
           {mode === "myDates" && (
-            <button onClick={() => onDelete(date.id)} className="text-xs font-black text-slate-400 hover:text-red-500">Delete</button>
-          )}
-
-          {isExplore && (
-            <button onClick={() => onSave(date.id)} className={`rounded-2xl px-4 py-2 text-xs font-black ${date.saved ? "bg-orange-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-orange-50 hover:text-orange-600"}`}>
-              {date.saved ? "Saved" : "Save"}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => onEdit(date)} className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-200">Edit</button>
+              <button onClick={() => onDelete(date.id)} className="rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-500 hover:bg-red-100">Delete</button>
+            </div>
           )}
         </div>
 
@@ -1105,7 +1189,7 @@ function DateCard({ date, rank, mode, onDelete, isLiked, onLike, onSave, onAddTo
                   <p className="text-sm font-semibold text-slate-500">{place.type}</p>
                 </div>
               </div>
-              {place.ordered.length > 0 && (
+              {place.ordered?.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {place.ordered.map((item) => (
                     <span key={item} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">{item}</span>
@@ -1140,7 +1224,7 @@ function DateCard({ date, rank, mode, onDelete, isLiked, onLike, onSave, onAddTo
         <div className="border-t border-slate-100 bg-slate-50 p-5">
           <div className="space-y-3">
             <Comment user={date.user} text="I’d absolutely do this again." />
-            {comments.slice(-2).map((comment) => (
+            {comments.slice(-3).map((comment) => (
               <Comment key={comment.id} user={comment.user} text={comment.text} />
             ))}
           </div>
@@ -1160,7 +1244,7 @@ function DateCard({ date, rank, mode, onDelete, isLiked, onLike, onSave, onAddTo
 function Comment({ user, text }) {
   return (
     <div className="flex gap-3">
-      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-xs font-black text-slate-500 ring-1 ring-slate-200">{user[0]}</div>
+      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-xs font-black text-slate-500 ring-1 ring-slate-200">{user?.[0] || "U"}</div>
       <div className="rounded-2xl bg-white px-4 py-3 text-sm ring-1 ring-slate-200">
         <span className="font-black text-slate-700">{user}</span>
         <span className="ml-2 text-slate-500">{text}</span>
