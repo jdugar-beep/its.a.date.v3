@@ -341,6 +341,7 @@ export default function App() {
   const [viewingProfileLoading, setViewingProfileLoading] = useState(false);
   const [publicExploreDates, setPublicExploreDates] = useState([]);
   const [selectedDateDetail, setSelectedDateDetail] = useState(null);
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user || null));
@@ -733,6 +734,9 @@ export default function App() {
 
   const kpis = useMemo(() => buildKpis(currentDates), [currentDates]);
 
+  const activeFilterCount = [selectedVibe, selectedType, selectedNeighborhood, selectedPrice]
+    .filter((value) => value !== "All").length + (search.trim() ? 1 : 0);
+
   const pageLabel = activePage === "myDates" ? "Your Dates" : activePage === "following" ? "Following" : "Explore";
   const pageTitle = activePage === "myDates" ? "Your ranked date nights" : activePage === "following" ? "Dates from people you follow" : "Find your next date idea";
   const pageDescription =
@@ -1033,13 +1037,40 @@ export default function App() {
           </div>
 
           <div className="p-4 md:p-5">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr]">
+            <div className="hidden gap-3 sm:grid-cols-2 md:grid lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr]">
               <Field label="Search" value={search} onChange={setSearch} placeholder={`Search ${selectedCity}, romantic, pasta...`} />
               <Select label="Sort by" value={sortBy} onChange={setSortBy} options={["Highest rated", "Most liked", "Most commented", "Cheapest", "Most expensive", "Newest"]} />
               <Select label="Type" value={selectedType} onChange={setSelectedType} options={filterOptions.types} />
               <Select label="Neighborhood" value={selectedNeighborhood} onChange={setSelectedNeighborhood} options={filterOptions.neighborhoods} />
               <Select label="Price" value={selectedPrice} onChange={setSelectedPrice} options={filterOptions.prices} />
               <Select label="Vibe" value={selectedVibe} onChange={setSelectedVibe} options={filterOptions.vibes} />
+            </div>
+
+            <div className="md:hidden">
+              <div className="flex gap-2">
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={`Search ${selectedCity} dates...`}
+                  className="min-w-0 flex-1 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsMobileFiltersOpen(true)}
+                  className="rounded-2xl bg-[#172033] px-4 py-3 text-sm font-black text-white shadow-sm"
+                >
+                  Filters{activeFilterCount ? ` (${activeFilterCount})` : ""}
+                </button>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between text-xs font-bold text-slate-500">
+                <span>{filtered.length} dates showing</span>
+                {activeFilterCount > 0 && (
+                  <button type="button" onClick={resetFilters} className="font-black text-orange-600">
+                    Clear filters
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -1197,6 +1228,51 @@ export default function App() {
           isFollowing={(person) => followingList.some((p) => p.id === person.id)}
           onToggleFollow={toggleFollow}
         />
+      )}
+
+      {isMobileFiltersOpen && (
+        <div className="fixed inset-0 z-[125] bg-slate-950/60 p-4 backdrop-blur-sm md:hidden">
+          <div className="fixed inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-[2rem] bg-white p-5 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-500">Filters</p>
+                <h2 className="mt-1 text-2xl font-black text-[#172033]">Refine {selectedCity} dates</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileFiltersOpen(false)}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-100 text-xl font-black text-slate-700"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid gap-4">
+              <Select label="Sort by" value={sortBy} onChange={setSortBy} options={["Highest rated", "Most liked", "Most commented", "Cheapest", "Most expensive", "Newest"]} />
+              <Select label="Type" value={selectedType} onChange={setSelectedType} options={filterOptions.types} />
+              <Select label="Neighborhood" value={selectedNeighborhood} onChange={setSelectedNeighborhood} options={filterOptions.neighborhoods} />
+              <Select label="Price" value={selectedPrice} onChange={setSelectedPrice} options={filterOptions.prices} />
+              <Select label="Vibe" value={selectedVibe} onChange={setSelectedVibe} options={filterOptions.vibes} />
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="rounded-2xl bg-slate-100 px-5 py-4 text-sm font-black text-slate-600"
+              >
+                Clear all
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsMobileFiltersOpen(false)}
+                className="rounded-2xl bg-orange-500 px-5 py-4 text-sm font-black text-white shadow-lg shadow-orange-200"
+              >
+                Show dates
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {selectedDateDetail && (
