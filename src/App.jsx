@@ -508,7 +508,11 @@ export default function App() {
     setComments(groupedComments);
   }
 
-  const exploreFeedDates = useMemo(() => [...publicExploreDates, ...exploreDates], [publicExploreDates]);
+  const exploreFeedDates = useMemo(
+  () => [...publicExploreDates, ...(exploreDates || [])],
+  [publicExploreDates]
+);
+  
   const currentDates = activePage === "myDates" ? myDates : exploreFeedDates;
   
   const enrichedDates = useMemo(() => {
