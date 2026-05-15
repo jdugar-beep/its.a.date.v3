@@ -398,7 +398,7 @@ export default function App() {
       .from("dates")
       .select("*")
       .eq("user_id", person.id)
-      .eq("is_public", true)
+      .or("is_public.eq.true,posted_to_explore.eq.true")
       .order("public_at", { ascending: false });
 
     if (error) {
@@ -455,21 +455,41 @@ export default function App() {
   async function loadPublicExploreDates() {
     const { data, error } = await supabase
       .from("dates")
-      .select("*, profiles(display_name, username)")
-      .eq("is_public", true)
-      .order("public_at", { ascending: false });
+      .select("*")
+      .or("is_public.eq.true,posted_to_explore.eq.true")
+      .order("public_at", { ascending: false, nullsFirst: false });
 
     if (error) {
-      console.error(error);
+      console.error("Public explore load error:", error);
+      alert(`Explore load error: ${error.message}`);
       return;
     }
 
-    const publicDates = (data || []).map((row) => {
+    const rows = data || [];
+    const userIds = [...new Set(rows.map((row) => row.user_id).filter(Boolean))];
+
+    let profilesById = {};
+    if (userIds.length) {
+      const { data: profilesData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .in("id", userIds);
+
+      if (profileError) {
+        console.error("Explore profile load error:", profileError);
+      }
+
+      profilesById = Object.fromEntries((profilesData || []).map((p) => [p.id, p]));
+    }
+
+    const publicDates = rows.map((row) => {
       const date = rowToDate(row);
-      const displayName = row.profiles?.display_name || row.profiles?.username || "User";
+      const ownerProfile = profilesById[row.user_id];
+      const displayName = ownerProfile?.display_name || ownerProfile?.username || "User";
+
       return {
         ...date,
-        user: displayName,
+        user: row.user_id === user.id ? "You" : displayName,
         avatar: displayName?.[0]?.toUpperCase() || "U",
         sourceUserId: row.user_id,
       };
@@ -642,6 +662,7 @@ export default function App() {
           places: payload.places,
           notes: payload.notes,
           is_public: editingDate.isPublic || false,
+          posted_to_explore: editingDate.isPublic || false,
         })
         .eq("id", editingDate.id)
         .eq("user_id", user.id)
@@ -669,6 +690,8 @@ export default function App() {
           places: payload.places,
           notes: payload.notes,
           is_public: false,
+        posted_to_explore: false,
+          posted_to_explore: false,
         })
         .select()
         .single();
@@ -709,10 +732,12 @@ export default function App() {
 
   async function togglePostToExplore(date) {
     const nextPublic = !date.isPublic;
+
     const { data, error } = await supabase
       .from("dates")
       .update({
         is_public: nextPublic,
+        posted_to_explore: nextPublic,
         public_at: nextPublic ? new Date().toISOString() : null,
       })
       .eq("id", date.id)
@@ -728,6 +753,8 @@ export default function App() {
     const updatedDate = rowToDate(data);
     setMyDates((prev) => prev.map((item) => (item.id === date.id ? updatedDate : item)));
     await loadPublicExploreDates();
+    await loadMyDates();
+    resetFilters();
     alert(nextPublic ? "Posted to Explore!" : "Removed from Explore.");
   }
 
@@ -1413,7 +1440,7 @@ function rowToDate(row) {
     places: row.places || [],
     notes: row.notes,
     created_at: row.created_at,
-    isPublic: !!row.is_public,
+    isPublic: !!(row.is_public || row.posted_to_explore),
     publicAt: row.public_at,
     sourceUserId: row.user_id,
   };
