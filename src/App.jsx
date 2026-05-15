@@ -398,7 +398,7 @@ export default function App() {
       .from("dates")
       .select("*")
       .eq("user_id", person.id)
-      .or("is_public.eq.true,posted_to_explore.eq.true")
+      .eq("is_public", true)
       .order("public_at", { ascending: false });
 
     if (error) {
@@ -409,6 +409,28 @@ export default function App() {
     }
 
     setViewingProfileLoading(false);
+  }
+
+  async function openPublicProfileById(profileId) {
+    if (!profileId || profileId === user.id) return;
+
+    const { data: person, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", profileId)
+      .maybeSingle();
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    if (!person) {
+      alert("Could not find that profile.");
+      return;
+    }
+
+    await openPublicProfile(person);
   }
 
   async function toggleFollow(person) {
@@ -456,12 +478,11 @@ export default function App() {
     const { data, error } = await supabase
       .from("dates")
       .select("*")
-      .or("is_public.eq.true,posted_to_explore.eq.true")
+      .eq("is_public", true)
       .order("public_at", { ascending: false, nullsFirst: false });
 
     if (error) {
-      console.error("Public explore load error:", error);
-      alert(`Explore load error: ${error.message}`);
+      console.error("Explore load error:", error);
       return;
     }
 
@@ -470,28 +491,28 @@ export default function App() {
 
     let profilesById = {};
     if (userIds.length) {
-      const { data: profilesData, error: profileError } = await supabase
+      const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
         .select("*")
         .in("id", userIds);
 
-      if (profileError) {
-        console.error("Explore profile load error:", profileError);
+      if (profilesError) {
+        console.error("Explore profile load error:", profilesError);
+      } else {
+        profilesById = Object.fromEntries((profilesData || []).map((person) => [person.id, person]));
       }
-
-      profilesById = Object.fromEntries((profilesData || []).map((p) => [p.id, p]));
     }
 
     const publicDates = rows.map((row) => {
       const date = rowToDate(row);
-      const ownerProfile = profilesById[row.user_id];
-      const displayName = ownerProfile?.display_name || ownerProfile?.username || "User";
-
+      const person = profilesById[row.user_id];
+      const displayName = person?.display_name || person?.username || "User";
       return {
         ...date,
-        user: row.user_id === user.id ? "You" : displayName,
+        user: displayName,
         avatar: displayName?.[0]?.toUpperCase() || "U",
         sourceUserId: row.user_id,
+        sourceProfile: person || null,
       };
     });
 
@@ -528,17 +549,27 @@ export default function App() {
     setComments(groupedComments);
   }
 
+  const followingFeedDates = useMemo(() => {
+    const followingIds = new Set(followingList.map((person) => person.id));
+    return publicExploreDates.filter((date) => followingIds.has(date.sourceUserId));
+  }, [publicExploreDates, followingList]);
+
   const exploreFeedDates = useMemo(
-  () => [...publicExploreDates, ...(exploreDates || [])],
-  [publicExploreDates]
-);
-  
-  const currentDates = activePage === "myDates" ? myDates : exploreFeedDates;
+    () => [...publicExploreDates, ...(exploreDates || [])],
+    [publicExploreDates]
+  );
+
+  const currentDates =
+    activePage === "myDates"
+      ? myDates
+      : activePage === "following"
+        ? followingFeedDates
+        : exploreFeedDates;
   
   const enrichedDates = useMemo(() => {
     return currentDates.map((date, index) => {
-      const baseLikes = activePage === "explore" ? getBaseLikes(date.id, index + 1) : 0;
-      const baseComments = activePage === "explore" ? getBaseComments(date.id, index + 1) : 0;
+      const baseLikes = (activePage === "explore" || activePage === "following") ? getBaseLikes(date.id, index + 1) : 0;
+      const baseComments = (activePage === "explore" || activePage === "following") ? getBaseComments(date.id, index + 1) : 0;
       return {
         ...date,
         likeCount: baseLikes + (exploreLikeCounts[date.id] || 0),
@@ -593,6 +624,17 @@ export default function App() {
   }, [enrichedDates, search, selectedVibe, selectedType, selectedNeighborhood, selectedPrice, sortBy]);
 
   const kpis = useMemo(() => buildKpis(currentDates), [currentDates]);
+
+  const pageLabel = activePage === "myDates" ? "Your Dates" : activePage === "following" ? "Following" : "Explore";
+  const pageTitle = activePage === "myDates" ? "Your ranked date nights" : activePage === "following" ? "Dates from people you follow" : "Find your next date idea";
+  const pageDescription =
+    activePage === "myDates"
+      ? "Track your own dates, edit them anytime, and see them on every device."
+      : activePage === "following"
+        ? "Keep up with public date ideas posted by accounts you follow."
+        : "Browse Chicago date ideas, like your favorites, comment, or copy them into your own list.";
+  const kpiCountLabel = activePage === "myDates" ? "Dates logged" : activePage === "following" ? "Following posts" : "Explore posts";
+  const kpiCountHelper = activePage === "myDates" ? "Your saved date nights" : activePage === "following" ? "From followed accounts" : "Public inspo posts";
 
   function resetFilters() {
     setSelectedVibe("All");
@@ -662,7 +704,6 @@ export default function App() {
           places: payload.places,
           notes: payload.notes,
           is_public: editingDate.isPublic || false,
-          posted_to_explore: editingDate.isPublic || false,
         })
         .eq("id", editingDate.id)
         .eq("user_id", user.id)
@@ -690,7 +731,6 @@ export default function App() {
           places: payload.places,
           notes: payload.notes,
           is_public: false,
-        posted_to_explore: false,
           posted_to_explore: false,
         })
         .select()
@@ -732,7 +772,6 @@ export default function App() {
 
   async function togglePostToExplore(date) {
     const nextPublic = !date.isPublic;
-
     const { data, error } = await supabase
       .from("dates")
       .update({
@@ -753,8 +792,6 @@ export default function App() {
     const updatedDate = rowToDate(data);
     setMyDates((prev) => prev.map((item) => (item.id === date.id ? updatedDate : item)));
     await loadPublicExploreDates();
-    await loadMyDates();
-    resetFilters();
     alert(nextPublic ? "Posted to Explore!" : "Removed from Explore.");
   }
 
@@ -852,6 +889,7 @@ export default function App() {
           <div className="hidden flex-wrap items-center gap-2 md:flex">
             <NavButton active={activePage === "myDates"} onClick={() => { setActivePage("myDates"); resetFilters(); }}>Your Dates</NavButton>
             <NavButton active={activePage === "explore"} onClick={() => { setActivePage("explore"); resetFilters(); }}>Explore</NavButton>
+            <NavButton active={activePage === "following"} onClick={() => { setActivePage("following"); resetFilters(); }}>Following</NavButton>
             <button onClick={openAddModal} className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg hover:bg-orange-600">
               + Add Date
             </button>
@@ -872,14 +910,12 @@ export default function App() {
       <main className="mx-auto max-w-7xl p-3 md:p-6">
         <section className="mb-5 overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-200">
           <div className="bg-gradient-to-br from-[#172033] to-[#26395f] p-5 text-white md:p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-300 md:text-sm">{activePage === "myDates" ? "Your Dates" : "Explore"}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-300 md:text-sm">{pageLabel}</p>
             <h2 className="mt-2 text-3xl font-black md:text-5xl">
-              {activePage === "myDates" ? "Your ranked date nights" : "Find your next date idea"}
+              {pageTitle}
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-              {activePage === "myDates"
-                ? "Track your own dates, edit them anytime, and see them on every device."
-                : "Browse Chicago date ideas, like your favorites, comment, or copy them into your own list."}
+              {pageDescription}
             </p>
           </div>
 
@@ -894,6 +930,23 @@ export default function App() {
             </div>
           </div>
         </section>
+
+        {!viewingProfile && activePage !== "myDates" && (
+          <div className="mb-5 flex flex-wrap gap-2 rounded-[2rem] bg-white p-2 shadow-sm ring-1 ring-slate-200">
+            <button
+              onClick={() => { setActivePage("explore"); resetFilters(); }}
+              className={`rounded-2xl px-5 py-3 text-sm font-black ${activePage === "explore" ? "bg-[#172033] text-white" : "text-slate-500 hover:bg-slate-50"}`}
+            >
+              Explore everyone
+            </button>
+            <button
+              onClick={() => { setActivePage("following"); resetFilters(); }}
+              className={`rounded-2xl px-5 py-3 text-sm font-black ${activePage === "following" ? "bg-[#172033] text-white" : "text-slate-500 hover:bg-slate-50"}`}
+            >
+              Following feed
+            </button>
+          </div>
+        )}
 
         {activePage === "myDates" && !viewingProfile && (
           <SocialHeaderCard
@@ -920,7 +973,7 @@ export default function App() {
           <>
 
         <section className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-          <KpiCard label={activePage === "myDates" ? "Dates logged" : "Explore posts"} value={kpis.count} helper={activePage === "myDates" ? "Your saved date nights" : "Public inspo posts"} />
+          <KpiCard label={kpiCountLabel} value={kpis.count} helper={kpiCountHelper} />
           <KpiCard label="Neighborhoods" value={kpis.neighborhoods} helper="Unique areas represented" />
           <KpiCard label="Average rating" value={kpis.averageRating} helper="Across this page" />
           <KpiCard label="Top vibe" value={kpis.topVibe} helper="Most common tag" />
@@ -942,8 +995,12 @@ export default function App() {
           <EmptyMyDates onAdd={openAddModal} onExplore={() => setActivePage("explore")} />
         ) : filtered.length === 0 ? (
           <div className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
-            <h3 className="text-2xl font-black">No matching dates yet</h3>
-            <p className="mt-2 text-slate-500">Try different filters or add a date with those attributes.</p>
+            <h3 className="text-2xl font-black">{activePage === "following" ? "No following posts yet" : "No matching dates yet"}</h3>
+            <p className="mt-2 text-slate-500">
+              {activePage === "following"
+                ? "Follow people who have posted dates to Explore, then their posts will show up here."
+                : "Try different filters or add a date with those attributes."}
+            </p>
           </div>
         ) : (
           <div className="grid gap-5 lg:grid-cols-2">
@@ -961,6 +1018,7 @@ export default function App() {
                 onAddToMine={addExploreToMyDates}
                 comments={comments[date.id] || []}
                 onComment={addComment}
+                onOpenProfile={openPublicProfileById}
               />
             ))}
           </div>
@@ -1408,10 +1466,11 @@ function NavButton({ active, onClick, children }) {
 function MobileNav({ activePage, setActivePage, resetFilters, openModal }) {
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 rounded-[1.7rem] bg-[#10182A] p-2 text-white shadow-2xl md:hidden">
-      <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => { setActivePage("myDates"); resetFilters(); }} className={`rounded-2xl py-3 text-xs font-black ${activePage === "myDates" ? "bg-white text-[#10182A]" : "text-slate-300"}`}>♡ Mine</button>
-        <button onClick={openModal} className="rounded-2xl bg-orange-500 py-3 text-xs font-black text-white">+ Add</button>
-        <button onClick={() => { setActivePage("explore"); resetFilters(); }} className={`rounded-2xl py-3 text-xs font-black ${activePage === "explore" ? "bg-white text-[#10182A]" : "text-slate-300"}`}>Explore</button>
+      <div className="grid grid-cols-4 gap-2">
+        <button onClick={() => { setActivePage("myDates"); resetFilters(); }} className={`rounded-2xl py-3 text-[11px] font-black ${activePage === "myDates" ? "bg-white text-[#10182A]" : "text-slate-300"}`}>♡ Mine</button>
+        <button onClick={() => { setActivePage("explore"); resetFilters(); }} className={`rounded-2xl py-3 text-[11px] font-black ${activePage === "explore" ? "bg-white text-[#10182A]" : "text-slate-300"}`}>Explore</button>
+        <button onClick={() => { setActivePage("following"); resetFilters(); }} className={`rounded-2xl py-3 text-[11px] font-black ${activePage === "following" ? "bg-white text-[#10182A]" : "text-slate-300"}`}>Following</button>
+        <button onClick={openModal} className="rounded-2xl bg-orange-500 py-3 text-[11px] font-black text-white">+ Add</button>
       </div>
     </div>
   );
@@ -1440,7 +1499,7 @@ function rowToDate(row) {
     places: row.places || [],
     notes: row.notes,
     created_at: row.created_at,
-    isPublic: !!(row.is_public || row.posted_to_explore),
+    isPublic: !!row.is_public,
     publicAt: row.public_at,
     sourceUserId: row.user_id,
   };
@@ -1525,9 +1584,9 @@ function getBaseComments(id, rank) {
   return 2 + ((id.length + rank * 3) % 11);
 }
 
-function DateCard({ date, rank, mode, onDelete, onEdit, onTogglePost, isLiked, onLike, onAddToMine, comments, onComment }) {
+function DateCard({ date, rank, mode, onDelete, onEdit, onTogglePost, isLiked, onLike, onAddToMine, comments, onComment, onOpenProfile }) {
   const [commentText, setCommentText] = useState("");
-  const isExplore = mode === "explore";
+  const isExplore = mode === "explore" || mode === "following";
 
   function submitComment() {
     onComment(date.id, commentText);
@@ -1540,13 +1599,17 @@ function DateCard({ date, rank, mode, onDelete, onEdit, onTogglePost, isLiked, o
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {isExplore ? (
-              <>
+              <button
+                type="button"
+                onClick={() => date.sourceUserId && onOpenProfile?.(date.sourceUserId)}
+                className={`flex items-center gap-3 text-left ${date.sourceUserId ? "hover:opacity-80" : "cursor-default"}`}
+              >
                 <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 font-black text-white">{date.avatar}</div>
                 <div>
                   <p className="text-sm font-black">{date.user}</p>
-                  <p className="text-xs font-semibold text-slate-400">posted a date idea</p>
+                  <p className="text-xs font-semibold text-slate-400">{date.sourceUserId ? "View profile" : "posted a date idea"}</p>
                 </div>
-              </>
+              </button>
             ) : (
               <div className="rounded-2xl bg-orange-100 px-4 py-2 text-sm font-black text-orange-600">#{rank} ranked</div>
             )}
