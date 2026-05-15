@@ -340,6 +340,7 @@ export default function App() {
   const [viewingProfileDates, setViewingProfileDates] = useState([]);
   const [viewingProfileLoading, setViewingProfileLoading] = useState(false);
   const [publicExploreDates, setPublicExploreDates] = useState([]);
+  const [selectedDateDetail, setSelectedDateDetail] = useState(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user || null));
@@ -1116,23 +1117,35 @@ export default function App() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             {filtered.map((date, index) => (
-              <DateCard
-                key={date.id}
-                date={date}
-                rank={index + 1}
-                mode={activePage}
-                onDelete={deleteDate}
-                onEdit={openEditModal}
-                onTogglePost={togglePostToExplore}
-                isLiked={!!likedExploreDates[date.id]}
-                onLike={toggleExploreLike}
-                onAddToMine={addExploreToMyDates}
-                comments={comments[date.id] || []}
-                onComment={addComment}
-                onOpenProfile={openPublicProfileById}
-              />
+              <React.Fragment key={date.id}>
+                <div className="md:hidden">
+                  <MobileCompactDateCard
+                    date={date}
+                    rank={index + 1}
+                    mode={activePage}
+                    onOpen={setSelectedDateDetail}
+                  />
+                </div>
+
+                <div className="hidden md:block">
+                  <DateCard
+                    date={date}
+                    rank={index + 1}
+                    mode={activePage}
+                    onDelete={deleteDate}
+                    onEdit={openEditModal}
+                    onTogglePost={togglePostToExplore}
+                    isLiked={!!likedExploreDates[date.id]}
+                    onLike={toggleExploreLike}
+                    onAddToMine={addExploreToMyDates}
+                    comments={comments[date.id] || []}
+                    onComment={addComment}
+                    onOpenProfile={openPublicProfileById}
+                  />
+                </div>
+              </React.Fragment>
             ))}
           </div>
         )}
@@ -1184,6 +1197,43 @@ export default function App() {
           isFollowing={(person) => followingList.some((p) => p.id === person.id)}
           onToggleFollow={toggleFollow}
         />
+      )}
+
+      {selectedDateDetail && (
+        <div className="fixed inset-0 z-[130] overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm md:hidden">
+          <div className="mx-auto max-w-lg pb-10">
+            <button
+              onClick={() => setSelectedDateDetail(null)}
+              className="mb-3 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm"
+            >
+              ← Back
+            </button>
+
+            <DateCard
+              date={selectedDateDetail}
+              rank={1}
+              mode={activePage}
+              onDelete={deleteDate}
+              onEdit={(date) => {
+                setSelectedDateDetail(null);
+                openEditModal(date);
+              }}
+              onTogglePost={async (date) => {
+                await togglePostToExplore(date);
+                setSelectedDateDetail((prev) => prev && prev.id === date.id ? { ...prev, isPublic: !prev.isPublic } : prev);
+              }}
+              isLiked={!!likedExploreDates[selectedDateDetail.id]}
+              onLike={toggleExploreLike}
+              onAddToMine={async (date) => {
+                await addExploreToMyDates(date);
+                setSelectedDateDetail(null);
+              }}
+              comments={comments[selectedDateDetail.id] || []}
+              onComment={addComment}
+              onOpenProfile={openPublicProfileById}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1716,6 +1766,77 @@ function getBaseLikes(id, rank) {
 
 function getBaseComments(id, rank) {
   return 2 + ((id.length + rank * 3) % 11);
+}
+
+function MobileCompactDateCard({ date, rank, mode, onOpen }) {
+  const isExploreLikePage = mode === "explore" || mode === "following";
+  const visibleVibes = (date.vibes || []).slice(0, 3);
+  const extraVibeCount = Math.max((date.vibes || []).length - visibleVibes.length, 0);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(date)}
+      className="block w-full rounded-3xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-200 active:scale-[0.99]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {isExploreLikePage ? (
+              <>
+                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-400 to-pink-500 text-xs font-black text-white">
+                  {date.avatar || date.user?.[0] || "U"}
+                </div>
+                <p className="truncate text-xs font-black uppercase tracking-[0.16em] text-orange-500">
+                  {date.user || "User"}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-500">
+                #{rank} ranked
+              </p>
+            )}
+          </div>
+
+          <h3 className="mt-2 line-clamp-2 text-xl font-black leading-tight text-[#172033]">
+            {date.title}
+          </h3>
+
+          <p className="mt-1 truncate text-sm font-bold text-slate-500">
+            {date.neighborhood} · {date.price} · {date.dateTypes?.slice(0, 2).join(" + ")}
+          </p>
+        </div>
+
+        <div className="shrink-0 rounded-2xl bg-amber-50 px-3 py-2 text-sm font-black text-amber-600">
+          ★ {date.rating}
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {visibleVibes.map((vibe) => (
+          <span
+            key={vibe}
+            className={`rounded-full px-3 py-1 text-xs font-black ${vibeColors[vibe] || "bg-slate-100 text-slate-700"}`}
+          >
+            #{vibe}
+          </span>
+        ))}
+        {extraVibeCount > 0 && (
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+            +{extraVibeCount}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-black text-slate-400">
+        <div className="flex items-center gap-3">
+          <span>♡ {date.likeCount || 0}</span>
+          <span>💬 {date.commentCount || 0}</span>
+        </div>
+        <span className="text-orange-500">Tap for details →</span>
+      </div>
+    </button>
+  );
 }
 
 function DateCard({ date, rank, mode, onDelete, onEdit, onTogglePost, isLiked, onLike, onAddToMine, comments, onComment, onOpenProfile }) {
