@@ -186,6 +186,7 @@ function safeLoad(key, fallback) {
 export default function App() {
   const [activePage, setActivePage] = useState("myDates");
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [myDates, setMyDates] = useState(() => safeLoad(STORAGE_KEY, []));
   const [savedExplore, setSavedExplore] = useState(() => safeLoad(SAVED_EXPLORE_KEY, {}));
   const [selectedVibe, setSelectedVibe] = useState("All");
@@ -208,17 +209,25 @@ export default function App() {
   }, [savedExplore]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setUser(data.session?.user || null);
+      setAuthLoading(false);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
+      setAuthLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const currentDates = activePage === "myDates" ? myDates : exploreDates;
@@ -396,6 +405,22 @@ export default function App() {
     resetFilters();
   }
 
+  if (authLoading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#eef7ff] px-4 text-[#172033]">
+        <div className="rounded-[2rem] bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-pink-500 text-2xl font-black text-white">♡</div>
+          <p className="text-sm font-black uppercase tracking-[0.2em] text-orange-500">IT’S A DATE</p>
+          <h1 className="mt-2 text-2xl font-black">Loading your account...</h1>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthGate setUser={setUser} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#eef7ff] pb-24 text-[#172033] md:pb-0">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-[#10182A]/95 px-4 py-4 text-white shadow-xl backdrop-blur md:px-6">
@@ -555,6 +580,131 @@ export default function App() {
           </form>
         </div>
       )}
+    </div>
+  );
+}
+
+function AuthGate({ setUser }) {
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function handleAuth(e) {
+    e.preventDefault();
+    setMessage("");
+
+    if (!email || !password) {
+      setMessage("Please enter an email and password.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setMessage("Password must be at least 6 characters.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    if (mode === "signup") {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      setIsSubmitting(false);
+
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
+
+      if (data.session?.user) {
+        setUser(data.session.user);
+      } else {
+        setMessage("Account created. Check your email to confirm your signup, then come back and log in.");
+      }
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setUser(data.user);
+  }
+
+  return (
+    <div className="min-h-screen bg-[#eef7ff] px-4 py-8 text-[#172033]">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
+        <div className="grid w-full overflow-hidden rounded-[2.5rem] bg-white shadow-2xl ring-1 ring-slate-200 lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="relative hidden bg-gradient-to-br from-[#10182A] via-[#172033] to-[#26395f] p-10 text-white lg:block">
+            <div className="absolute right-8 top-8 rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-orange-200">Chicago dating, ranked</div>
+            <div className="flex h-full flex-col justify-between">
+              <div>
+                <div className="grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-pink-500 text-3xl font-black shadow-lg">♡</div>
+                <h1 className="mt-8 text-5xl font-black tracking-tight">IT’S A DATE</h1>
+                <p className="mt-4 max-w-md text-lg leading-8 text-slate-300">Sign in to rank your date nights, save Chicago ideas, and keep your favorites tied to your account.</p>
+              </div>
+
+              <div className="grid gap-3">
+                <div className="rounded-3xl bg-white/10 p-5 backdrop-blur">
+                  <p className="text-sm font-black text-orange-200">Your private list</p>
+                  <p className="mt-1 text-sm text-slate-300">Only logged-in users can access the app.</p>
+                </div>
+                <div className="rounded-3xl bg-white/10 p-5 backdrop-blur">
+                  <p className="text-sm font-black text-orange-200">Explore date ideas</p>
+                  <p className="mt-1 text-sm text-slate-300">Browse, like, comment, and copy ideas into your own rankings.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="p-6 sm:p-8 md:p-10">
+            <div className="mx-auto max-w-md">
+              <div className="mb-8 text-center lg:hidden">
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-orange-400 to-pink-500 text-3xl font-black text-white shadow-lg">♡</div>
+                <h1 className="mt-4 text-4xl font-black tracking-tight">IT’S A DATE</h1>
+                <p className="mt-2 text-sm font-semibold text-slate-500">Log in before using the app.</p>
+              </div>
+
+              <p className="text-sm font-black uppercase tracking-[0.2em] text-orange-500">Welcome</p>
+              <h2 className="mt-2 text-3xl font-black">{mode === "login" ? "Log in to continue" : "Create your account"}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">You’ll need an account before you can view or add dates.</p>
+
+              <div className="mt-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
+                <button type="button" onClick={() => { setMode("login"); setMessage(""); }} className={`rounded-xl px-4 py-3 text-sm font-black ${mode === "login" ? "bg-white text-[#172033] shadow-sm" : "text-slate-500"}`}>Log in</button>
+                <button type="button" onClick={() => { setMode("signup"); setMessage(""); }} className={`rounded-xl px-4 py-3 text-sm font-black ${mode === "signup" ? "bg-white text-[#172033] shadow-sm" : "text-slate-500"}`}>Sign up</button>
+              </div>
+
+              <form onSubmit={handleAuth} className="mt-6 space-y-4">
+                <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" />
+                <label className="block">
+                  <span className="mb-2 block text-sm font-black text-slate-700">Password</span>
+                  <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" type="password" className="w-full rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-400" />
+                </label>
+
+                {message && (
+                  <div className="rounded-2xl bg-orange-50 px-4 py-3 text-sm font-bold leading-6 text-orange-700 ring-1 ring-orange-100">{message}</div>
+                )}
+
+                <button disabled={isSubmitting} type="submit" className="w-full rounded-2xl bg-orange-500 px-6 py-4 font-black text-white shadow-lg shadow-orange-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60">
+                  {isSubmitting ? "Working..." : mode === "login" ? "Log in" : "Sign up"}
+                </button>
+              </form>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
