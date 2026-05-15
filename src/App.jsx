@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "./utils/supabase";
+import { supabase } from "./utils/supabase.js";
 
 const STORAGE_KEY = "daterank_my_dates_v3";
 const SAVED_EXPLORE_KEY = "daterank_saved_explore_v1";
