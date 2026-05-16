@@ -212,15 +212,90 @@ const exploreDates = [
     ],
     notes: "Light, low-pressure, and good when you want something besides a formal dinner.",
   },
+  {
+    id: "explore-la-silverlake-night",
+    city: "Los Angeles",
+    user: "Zoe",
+    avatar: "Z",
+    title: "Silver Lake Dinner + Drinks",
+    neighborhood: "Silver Lake",
+    price: "$$$",
+    dateTypes: ["Dinner", "Drinks"],
+    vibes: ["Fun", "Artsy", "Lively"],
+    rating: 9.1,
+    estimatedTotalCost: "$100–$170",
+    places: [
+      { name: "Bacari Silverlake", type: "Dinner", ordered: ["Cicchetti", "Cauliflower", "Pasta"] },
+      { name: "Bar Stella", type: "Drinks", ordered: ["Martini"] },
+    ],
+    notes: "Very LA without feeling too formal. Great for a fun second or third date.",
+  },
+  {
+    id: "explore-la-venice-day",
+    city: "Los Angeles",
+    user: "Cam",
+    avatar: "C",
+    title: "Venice Beach Day Date",
+    neighborhood: "Venice",
+    price: "$$",
+    dateTypes: ["Coffee", "Walk", "Activity"],
+    vibes: ["Cute", "Daytime", "Casual"],
+    rating: 8.8,
+    estimatedTotalCost: "$40–$90",
+    places: [
+      { name: "Menotti's", type: "Coffee", ordered: ["Latte"] },
+      { name: "Venice Canals", type: "Walk", ordered: [] },
+      { name: "Abbot Kinney", type: "Activity", ordered: [] },
+    ],
+    notes: "Easy, walkable, and low-pressure. Best when the weather is perfect.",
+  },
+  {
+    id: "explore-la-westhollywood",
+    city: "Los Angeles",
+    user: "Riley",
+    avatar: "R",
+    title: "West Hollywood Dinner Date",
+    neighborhood: "West Hollywood",
+    price: "$$$",
+    dateTypes: ["Dinner", "Cocktails"],
+    vibes: ["Pretty", "Lively", "Impressive"],
+    rating: 9.3,
+    estimatedTotalCost: "$130–$220",
+    places: [
+      { name: "Gracias Madre", type: "Dinner", ordered: ["Guacamole", "Enchiladas", "Margaritas"] },
+      { name: "Employees Only LA", type: "Cocktails", ordered: ["Signature cocktails"] },
+    ],
+    notes: "Pretty, social, and good for a date where you want the night to feel planned.",
+  },
+  {
+    id: "explore-la-santa-monica",
+    city: "Los Angeles",
+    user: "Kai",
+    avatar: "K",
+    title: "Santa Monica Sunset Date",
+    neighborhood: "Santa Monica",
+    price: "$$",
+    dateTypes: ["Walk", "Dinner", "Dessert"],
+    vibes: ["Romantic", "Pretty", "Low Pressure"],
+    rating: 8.9,
+    estimatedTotalCost: "$70–$130",
+    places: [
+      { name: "Palisades Park", type: "Walk", ordered: [] },
+      { name: "Elephante", type: "Dinner", ordered: ["Whipped eggplant", "Pizza"] },
+      { name: "Salt & Straw", type: "Dessert", ordered: ["Ice cream"] },
+    ],
+    notes: "Sunset makes this feel romantic without needing a super fancy plan.",
+  },
 ];
 
 const allVibes = ["Romantic", "Pretty", "Lively", "Cozy", "Dark", "Fun", "Cute", "Daytime", "Artsy", "Fancy", "Casual", "Intimate", "Impressive", "Low Pressure", "Adventurous"];
 const allTypes = ["Dinner", "Lunch", "Drinks", "Cocktails", "Coffee", "Dessert", "Activity", "Walk", "Brunch", "Museum", "Show", "Rooftop"];
-const cities = ["Chicago", "New York"];
+const cities = ["Chicago", "New York", "Los Angeles"];
 
 const neighborhoodsByCity = {
   Chicago: ["West Loop", "River North", "Loop", "Logan Square", "Wicker Park", "Lincoln Park", "Lakeview", "Gold Coast", "Hyde Park", "Andersonville", "Chinatown", "Ravenswood", "West Town", "Old Town", "Humboldt Park", "Other"],
   "New York": ["West Village", "SoHo", "Lower East Side", "Williamsburg", "Greenwich Village", "East Village", "Chelsea", "Flatiron", "Tribeca", "Upper West Side", "Upper East Side", "DUMBO", "Park Slope", "Bushwick", "Astoria", "Other"],
+  "Los Angeles": ["Silver Lake", "Venice", "West Hollywood", "Santa Monica", "Los Feliz", "Echo Park", "Downtown LA", "Koreatown", "Culver City", "Hollywood", "Beverly Hills", "Highland Park", "Arts District", "Pasadena", "Malibu", "Other"],
 };
 
 function getNeighborhoodsForCity(city) {
@@ -1117,7 +1192,7 @@ export default function App() {
         ) : (
           <>
 
-        <section className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+        <section className="mb-4 grid grid-cols-4 gap-2 md:mb-5 md:gap-3">
           <KpiCard label={kpiCountLabel} value={kpis.count} helper={kpiCountHelper} />
           <KpiCard label="Neighborhoods" value={kpis.neighborhoods} helper="Unique areas represented" />
           <KpiCard label="Average rating" value={kpis.averageRating} helper="Across this page" />
@@ -1441,7 +1516,7 @@ function PublicProfilePage({ person, selectedCity, dates, loading, isFollowing, 
         </div>
       </section>
 
-      <section className="mb-5 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+      <section className="mb-4 grid grid-cols-4 gap-2 md:mb-5 md:gap-3">
         <KpiCard label="Dates" value={kpis.count} helper={`${selectedCity} public rankings`} />
         <KpiCard label="Neighborhoods" value={kpis.neighborhoods} helper="Unique areas represented" />
         <KpiCard label="Average rating" value={kpis.averageRating} helper="Across their dates" />
@@ -1699,17 +1774,39 @@ function UserMenu({ user, profile, onProfile }) {
 
 
 function CitySwitcher({ selectedCity, onChange, compact = false }) {
+  const [open, setOpen] = useState(false);
+  const shortLabel = selectedCity === "New York" ? "NYC" : selectedCity === "Los Angeles" ? "LA" : "CHI";
+
+  function chooseCity(city) {
+    onChange(city);
+    setOpen(false);
+  }
+
   return (
-    <div className={`flex rounded-2xl bg-white/10 p-1 ${compact ? "max-w-[150px]" : ""}`}>
-      {cities.map((city) => (
-        <button
-          key={city}
-          onClick={() => onChange(city)}
-          className={`rounded-xl px-3 py-2 text-xs font-black transition ${selectedCity === city ? "bg-white text-[#10182A]" : "text-slate-300 hover:bg-white/10"}`}
-        >
-          {compact ? (city === "New York" ? "NYC" : "CHI") : city}
-        </button>
-      ))}
+    <div className={`relative ${compact ? "w-[92px]" : "w-[170px]"}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between rounded-2xl bg-white/10 px-3 py-3 text-xs font-black text-white ring-1 ring-white/10 hover:bg-white/20"
+      >
+        <span>{compact ? shortLabel : selectedCity}</span>
+        <span className="text-slate-300">⌄</span>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-[160] mt-2 w-44 overflow-hidden rounded-2xl bg-white p-1 text-[#10182A] shadow-2xl ring-1 ring-slate-200">
+          {cities.map((city) => (
+            <button
+              key={city}
+              type="button"
+              onClick={() => chooseCity(city)}
+              className={`block w-full rounded-xl px-3 py-3 text-left text-xs font-black hover:bg-slate-100 ${selectedCity === city ? "bg-orange-50 text-orange-600" : "text-slate-700"}`}
+            >
+              {city}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1776,10 +1873,10 @@ function buildKpis(dates) {
 
 function KpiCard({ label, value, helper }) {
   return (
-    <div className="rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <div className="mt-3 text-3xl font-black text-[#172033]">{value}</div>
-      <p className="mt-1 text-sm font-semibold text-slate-500">{helper}</p>
+    <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200 md:rounded-[1.5rem] md:p-5">
+      <p className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-slate-400 md:text-xs md:tracking-[0.18em]">{label}</p>
+      <div className="mt-1 truncate text-xl font-black text-[#172033] md:mt-3 md:text-3xl">{value}</div>
+      <p className="mt-1 hidden text-sm font-semibold text-slate-500 md:block">{helper}</p>
     </div>
   );
 }
